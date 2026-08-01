@@ -43,6 +43,38 @@ pub struct Player {
 
 pub type MprisServer = Arc<Server<Player>>;
 
+pub const BUS_NAME: &str = "org.mpris.MediaPlayer2.attacca";
+const OBJECT_PATH: &str = "/org/mpris/MediaPlayer2";
+
+/// True when another instance already owns our MPRIS name; best-effort asks it
+/// to raise its window. The caller should then exit rather than start a second
+/// instance, which would fight the first over the Roon extension identity (the
+/// Core resets connections when one identity connects twice).
+///
+/// The ownership check must come first: mpris-server requests the name with
+/// replacement allowed, so simply registering would silently steal it from the
+/// running instance and leave the name unowned once we exit.
+pub async fn instance_already_running() -> bool {
+    let Ok(conn) = zbus::Connection::session().await else {
+        return false;
+    };
+    let Ok(dbus) = zbus::fdo::DBusProxy::new(&conn).await else {
+        return false;
+    };
+    let Ok(name) = BUS_NAME.try_into() else {
+        return false;
+    };
+    if !dbus.name_has_owner(name).await.unwrap_or(false) {
+        return false;
+    }
+    if let Ok(proxy) =
+        zbus::Proxy::new(&conn, BUS_NAME, OBJECT_PATH, "org.mpris.MediaPlayer2").await
+    {
+        let _ = proxy.call_method("Raise", &()).await;
+    }
+    true
+}
+
 /// Register on the session bus. Returns None (with a log line) when D-Bus is
 /// unavailable — the app works fine without MPRIS.
 pub async fn serve(cmds: UnboundedSender<Cmd>) -> Option<MprisServer> {
@@ -188,6 +220,7 @@ fn volume_frac(now: &NowPlaying) -> f64 {
 
 impl RootInterface for Player {
     async fn raise(&self) -> fdo::Result<()> {
+        self.send(Cmd::RaiseWindow);
         Ok(())
     }
     async fn quit(&self) -> fdo::Result<()> {
@@ -206,7 +239,7 @@ impl RootInterface for Player {
         Ok(false)
     }
     async fn can_raise(&self) -> fdo::Result<bool> {
-        Ok(false)
+        Ok(true)
     }
     async fn has_track_list(&self) -> fdo::Result<bool> {
         Ok(false)

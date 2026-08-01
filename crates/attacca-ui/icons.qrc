@@ -10,5 +10,9 @@
         <file alias="volume.svg">assets/volume.svg</file>
         <file alias="note.svg">assets/note.svg</file>
         <file alias="link.svg">assets/link.svg</file>
+        <file alias="shuffle.svg">assets/shuffle.svg</file>
+        <file alias="repeat.svg">assets/repeat.svg</file>
+        <file alias="repeat_one.svg">assets/repeat_one.svg</file>
+        <file alias="radio.svg">assets/radio.svg</file>
     </qresource>
 </RCC>

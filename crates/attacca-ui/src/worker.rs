@@ -29,6 +29,10 @@ pub enum Cmd {
     PlayFromHere(u64),
     GroupInfo,
     ApplyGrouping(Vec<String>),
+    SetShuffle(bool),
+    SetLoop(String),
+    SetRadio(bool),
+    RaiseWindow,
 }
 
 const PAGE_SIZE: u32 = 100;
@@ -159,6 +163,17 @@ fn push_view(qt: &CxxQtThread<App>, zone: Option<&Zone>, mpris_server: &Option<M
         .unwrap_or_default();
 
     let play_state = zone.map(|z| format!("{:?}", z.state)).unwrap_or_default();
+    let settings = zone.and_then(|z| z.settings.as_ref());
+    let shuffle = settings.is_some_and(|s| s.shuffle);
+    let auto_radio = settings.is_some_and(|s| s.auto_radio);
+    let loop_mode = settings
+        .map(|s| match s.r#loop {
+            attacca_core::LoopMode::Loop => "loop",
+            attacca_core::LoopMode::LoopOne => "loop_one",
+            attacca_core::LoopMode::Disabled => "disabled",
+        })
+        .unwrap_or("disabled")
+        .to_owned();
     let can_next = zone.is_some_and(|z| z.is_next_allowed);
     let can_previous = zone.is_some_and(|z| z.is_previous_allowed);
     let seek = zone.and_then(|z| z.seek_position).unwrap_or(0.0);
@@ -204,6 +219,9 @@ fn push_view(qt: &CxxQtThread<App>, zone: Option<&Zone>, mpris_server: &Option<M
         app.as_mut().set_volume(volume);
         app.as_mut().set_volume_min(volume_min);
         app.as_mut().set_volume_max(volume_max);
+        app.as_mut().set_shuffle(shuffle);
+        app.as_mut().set_auto_radio(auto_radio);
+        app.as_mut().set_loop_mode(QString::from(&loop_mode));
     });
 }
 
@@ -593,6 +611,24 @@ async fn session(
                     }
                     Cmd::PlayFromHere(id) => match zone {
                         Some(z) => transport.play_from_here(&z.zone_id, id).await,
+                        None => Ok(()),
+                    },
+                    Cmd::RaiseWindow => {
+                        push(qt, |mut app| app.as_mut().raise_window());
+                        Ok(())
+                    }
+                    Cmd::SetShuffle(on) => match zone {
+                        Some(z) => transport.change_settings(&z.zone_id, Some(on), None, None).await,
+                        None => Ok(()),
+                    },
+                    Cmd::SetLoop(mode) => match zone {
+                        Some(z) => {
+                            transport.change_settings(&z.zone_id, None, Some(&mode), None).await
+                        }
+                        None => Ok(()),
+                    },
+                    Cmd::SetRadio(on) => match zone {
+                        Some(z) => transport.change_settings(&z.zone_id, None, None, Some(on)).await,
                         None => Ok(()),
                     },
                     Cmd::GroupInfo => {

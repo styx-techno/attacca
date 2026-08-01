@@ -9,7 +9,7 @@ use std::path::PathBuf;
 pub use roon_api::{
     Browse, BrowseItem, BrowseList, BrowseOptions, BrowseResult, ControlAction, Core,
     FileTokenStore, ImageOptions, ImageService, LoadOptions, LoadResult, MuteAction, NowPlaying,
-    Output, PairingState, PlayState, QueueChange, QueueEvent, QueueItem, RoonClient,
+    LoopMode, Output, PairingState, PlayState, QueueChange, QueueEvent, QueueItem, RoonClient,
     RoonClientBuilder, RoonEvent, SeekMode, Transport, Volume, VolumeMode, Zone, ZoneEvent,
     ZoneSeek, ZoneSettings,
 };

@@ -14,6 +14,21 @@ fn main() {
         )
         .init();
 
+    // Single instance: a second launch raises the running window and exits.
+    // Two instances would share one Roon extension identity, and the Core
+    // resets connections when the same identity connects twice.
+    // ATTACCA_ALLOW_MULTI=1 bypasses the check for development.
+    if std::env::var_os("ATTACCA_ALLOW_MULTI").is_none() {
+        let running = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .is_ok_and(|rt| rt.block_on(mpris::instance_already_running()));
+        if running {
+            println!("Attacca is already running — raised the existing window.");
+            return;
+        }
+    }
+
     // Material dark is our look; allow the user to override via env.
     if std::env::var_os("QT_QUICK_CONTROLS_STYLE").is_none() {
         std::env::set_var("QT_QUICK_CONTROLS_STYLE", "Material");

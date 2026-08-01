@@ -38,6 +38,10 @@ pub mod qobject {
         #[qproperty(f64, volume_max, cxx_name = "volumeMax")]
         #[qproperty(QString, image_base, cxx_name = "imageBase")]
         #[qproperty(bool, browse_busy, cxx_name = "browseBusy")]
+        #[qproperty(bool, shuffle)]
+        #[qproperty(bool, auto_radio, cxx_name = "autoRadio")]
+        /// "loop" | "loop_one" | "disabled"
+        #[qproperty(QString, loop_mode, cxx_name = "loopMode")]
         type App = super::AppRust;
 
         /// Emitted when the browse view changes to a new list; the UI should
@@ -55,6 +59,11 @@ pub mod qobject {
         /// Transient user-facing notification.
         #[qsignal]
         fn toast(self: Pin<&mut App>, message: QString);
+
+        /// Another launch asked us to come to the front (MPRIS Raise).
+        #[qsignal]
+        #[cxx_name = "raiseWindow"]
+        fn raise_window(self: Pin<&mut App>);
 
         /// Full queue snapshot for the selected zone as a JSON array:
         /// [{queueItemId, title, subtitle, imageKey, length}, …]
@@ -118,6 +127,19 @@ pub mod qobject {
         fn play_from_here(self: Pin<&mut Self>, queue_item_id: f64);
 
         #[qinvokable]
+        #[cxx_name = "toggleShuffle"]
+        fn toggle_shuffle(self: Pin<&mut Self>);
+
+        /// Cycles disabled → loop → loop_one → disabled.
+        #[qinvokable]
+        #[cxx_name = "cycleLoop"]
+        fn cycle_loop(self: Pin<&mut Self>);
+
+        #[qinvokable]
+        #[cxx_name = "toggleRadio"]
+        fn toggle_radio(self: Pin<&mut Self>);
+
+        #[qinvokable]
         #[cxx_name = "requestGroupInfo"]
         fn request_group_info(self: Pin<&mut Self>);
 
@@ -155,6 +177,9 @@ pub struct AppRust {
     volume_max: f64,
     image_base: QString,
     browse_busy: bool,
+    shuffle: bool,
+    auto_radio: bool,
+    loop_mode: QString,
 }
 
 impl Default for AppRust {
@@ -180,6 +205,9 @@ impl Default for AppRust {
             volume_max: 100.0,
             image_base: QString::default(),
             browse_busy: false,
+            shuffle: false,
+            auto_radio: false,
+            loop_mode: QString::from("disabled"),
         }
     }
 }
@@ -253,6 +281,25 @@ impl qobject::App {
 
     pub fn play_from_here(self: Pin<&mut Self>, queue_item_id: f64) {
         self.send(Cmd::PlayFromHere(queue_item_id as u64));
+    }
+
+    pub fn toggle_shuffle(self: Pin<&mut Self>) {
+        let next = !*self.shuffle();
+        self.send(Cmd::SetShuffle(next));
+    }
+
+    pub fn cycle_loop(self: Pin<&mut Self>) {
+        let next = match self.loop_mode().to_string().as_str() {
+            "disabled" => "loop",
+            "loop" => "loop_one",
+            _ => "disabled",
+        };
+        self.send(Cmd::SetLoop(next.to_owned()));
+    }
+
+    pub fn toggle_radio(self: Pin<&mut Self>) {
+        let next = !*self.auto_radio();
+        self.send(Cmd::SetRadio(next));
     }
 
     pub fn request_group_info(self: Pin<&mut Self>) {

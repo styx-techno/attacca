@@ -106,6 +106,12 @@ ApplicationWindow {
                 queueModel.append(it)
         }
 
+        onRaiseWindow: {
+            root.show()
+            root.raise()
+            root.requestActivate()
+        }
+
         onGroupInfo: json => {
             const outputs = JSON.parse(json)
             groupModel.clear()
@@ -467,6 +473,44 @@ ApplicationWindow {
                     implicitHeight: 56
                     enabled: app.canNext
                     onClicked: app.next()
+                }
+            }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignHCenter
+                spacing: 22
+
+                ToolButton {
+                    icon.source: "qrc:/icons/shuffle.svg"
+                    icon.width: 19
+                    icon.height: 19
+                    icon.color: app.shuffle ? root.Material.accent : "#6a6b75"
+                    ToolTip.visible: hovered
+                    ToolTip.text: app.shuffle ? "Shuffle on" : "Shuffle off"
+                    onClicked: app.toggleShuffle()
+                }
+
+                ToolButton {
+                    icon.source: app.loopMode === "loop_one" ? "qrc:/icons/repeat_one.svg"
+                                                             : "qrc:/icons/repeat.svg"
+                    icon.width: 19
+                    icon.height: 19
+                    icon.color: app.loopMode !== "disabled" ? root.Material.accent : "#6a6b75"
+                    ToolTip.visible: hovered
+                    ToolTip.text: app.loopMode === "loop" ? "Repeat queue"
+                                : app.loopMode === "loop_one" ? "Repeat track" : "Repeat off"
+                    onClicked: app.cycleLoop()
+                }
+
+                ToolButton {
+                    icon.source: "qrc:/icons/radio.svg"
+                    icon.width: 19
+                    icon.height: 19
+                    icon.color: app.autoRadio ? root.Material.accent : "#6a6b75"
+                    ToolTip.visible: hovered
+                    ToolTip.text: app.autoRadio ? "Roon Radio on — keeps playing after the queue"
+                                                : "Roon Radio off"
+                    onClicked: app.toggleRadio()
                 }
             }
 
