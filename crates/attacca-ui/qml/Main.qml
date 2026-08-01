@@ -2,6 +2,7 @@ import QtCore
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
+import QtQuick.Effects
 import QtQuick.Layouts
 import org.attacca
 
@@ -169,8 +170,32 @@ ApplicationWindow {
         currentIndex: tabs.currentIndex
 
         // ───────────────────────────── Now Playing ─────────────────────────
-        ColumnLayout {
-            Layout.margins: 24
+        Item {
+            // Blurred artwork backdrop
+            Image {
+                anchors.fill: parent
+                source: app.artUrl
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                visible: false
+                id: backdropSource
+            }
+            MultiEffect {
+                anchors.fill: parent
+                source: backdropSource
+                blurEnabled: true
+                blur: 1.0
+                blurMax: 64
+                opacity: 0.30
+            }
+            Rectangle {
+                anchors.fill: parent
+                color: "#101014"
+                opacity: 0.45
+            }
+
+            ColumnLayout {
+            anchors.fill: parent
             spacing: 14
 
             ComboBox {
@@ -207,11 +232,12 @@ ApplicationWindow {
                         visible: status === Image.Ready
                     }
 
-                    Text {
+                    Image {
                         anchors.centerIn: parent
-                        text: "♪"
-                        color: "#33343c"
-                        font.pixelSize: artFrame.width / 4
+                        source: "qrc:/icons/note.svg"
+                        sourceSize.width: artFrame.width / 4
+                        sourceSize.height: artFrame.width / 4
+                        opacity: 0.12
                         visible: app.artUrl.toString() === ""
                     }
                 }
@@ -292,8 +318,12 @@ ApplicationWindow {
 
                 RoundButton {
                     flat: true
-                    text: "◀◀"
-                    font.pixelSize: 16
+                    icon.source: "qrc:/icons/prev.svg"
+                    icon.width: 26
+                    icon.height: 26
+                    icon.color: enabled ? "#c9cad4" : "#4a4b55"
+                    implicitWidth: 56
+                    implicitHeight: 56
                     enabled: app.canPrevious
                     onClicked: app.previous()
                 }
@@ -301,16 +331,23 @@ ApplicationWindow {
                 RoundButton {
                     implicitWidth: 76
                     implicitHeight: 76
-                    text: app.playState === "Playing" ? "▮▮" : "▶"
-                    font.pixelSize: 24
+                    icon.source: app.playState === "Playing" ? "qrc:/icons/pause.svg"
+                                                             : "qrc:/icons/play.svg"
+                    icon.width: 34
+                    icon.height: 34
+                    icon.color: "#101014"
                     Material.background: root.Material.accent
                     onClicked: app.playPause()
                 }
 
                 RoundButton {
                     flat: true
-                    text: "▶▶"
-                    font.pixelSize: 16
+                    icon.source: "qrc:/icons/next.svg"
+                    icon.width: 26
+                    icon.height: 26
+                    icon.color: enabled ? "#c9cad4" : "#4a4b55"
+                    implicitWidth: 56
+                    implicitHeight: 56
                     enabled: app.canNext
                     onClicked: app.next()
                 }
@@ -324,9 +361,11 @@ ApplicationWindow {
                 visible: app.hasVolume
                 spacing: 12
 
-                Label {
-                    text: "♫"
-                    color: "#7c7d88"
+                Image {
+                    source: "qrc:/icons/volume.svg"
+                    sourceSize.width: 18
+                    sourceSize.height: 18
+                    opacity: 0.55
                 }
                 Slider {
                     id: volume
@@ -346,6 +385,7 @@ ApplicationWindow {
                     font.pixelSize: 12
                 }
             }
+            }
         }
 
         // ─────────────────────────────── Browse ────────────────────────────
@@ -359,15 +399,20 @@ ApplicationWindow {
                 spacing: 8
 
                 ToolButton {
-                    text: "‹"
-                    font.pixelSize: 22
+                    icon.source: "qrc:/icons/back.svg"
+                    icon.width: 22
+                    icon.height: 22
+                    icon.color: "#c9cad4"
                     visible: root.browseLevel > 0 || root.inSearch
                     onClicked: (root.inSearch && root.browseLevel === 0)
                                ? app.browseHome()
                                : app.browseBack()
                 }
                 ToolButton {
-                    text: "⌂"
+                    icon.source: "qrc:/icons/home.svg"
+                    icon.width: 20
+                    icon.height: 20
+                    icon.color: "#c9cad4"
                     onClicked: app.browseHome()
                 }
                 Label {
@@ -390,8 +435,19 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.leftMargin: 16
                 Layout.rightMargin: 16
+                leftPadding: 36
                 placeholderText: "Search library, TIDAL, Qobuz…"
                 onAccepted: app.search(text)
+
+                Image {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 6
+                    anchors.verticalCenter: parent.verticalCenter
+                    source: "qrc:/icons/search.svg"
+                    sourceSize.width: 18
+                    sourceSize.height: 18
+                    opacity: 0.45
+                }
             }
 
             Item {
@@ -416,6 +472,15 @@ ApplicationWindow {
                 delegate: Item {
                     width: grid.cellWidth
                     height: grid.cellHeight
+                    scale: tileHover.hovered ? 1.03 : 1.0
+                    z: tileHover.hovered ? 1 : 0
+
+                    Behavior on scale { NumberAnimation { duration: 120 } }
+
+                    HoverHandler {
+                        id: tileHover
+                        cursorShape: Qt.PointingHandCursor
+                    }
 
                     ColumnLayout {
                         anchors.fill: parent
