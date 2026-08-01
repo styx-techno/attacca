@@ -62,6 +62,12 @@ pub mod qobject {
         #[cxx_name = "queueItems"]
         fn queue_items(self: Pin<&mut App>, items_json: QString);
 
+        /// Grouping candidates for the selected zone as a JSON array:
+        /// [{outputId, name, zoneName, inCurrent, canGroup}, …]
+        #[qsignal]
+        #[cxx_name = "groupInfo"]
+        fn group_info(self: Pin<&mut App>, outputs_json: QString);
+
         /// Start discovery + the worker thread. Idempotent; call from QML once.
         #[qinvokable]
         fn start(self: Pin<&mut Self>);
@@ -110,6 +116,16 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "playFromHere"]
         fn play_from_here(self: Pin<&mut Self>, queue_item_id: f64);
+
+        #[qinvokable]
+        #[cxx_name = "requestGroupInfo"]
+        fn request_group_info(self: Pin<&mut Self>);
+
+        /// `ids_json` is a JSON array of the output ids that should form the
+        /// selected zone after applying.
+        #[qinvokable]
+        #[cxx_name = "applyGrouping"]
+        fn apply_grouping(self: Pin<&mut Self>, ids_json: &QString);
     }
 
     impl cxx_qt::Threading for App {}
@@ -237,5 +253,17 @@ impl qobject::App {
 
     pub fn play_from_here(self: Pin<&mut Self>, queue_item_id: f64) {
         self.send(Cmd::PlayFromHere(queue_item_id as u64));
+    }
+
+    pub fn request_group_info(self: Pin<&mut Self>) {
+        self.send(Cmd::GroupInfo);
+    }
+
+    pub fn apply_grouping(self: Pin<&mut Self>, ids_json: &QString) {
+        match serde_json::from_str::<Vec<String>>(&ids_json.to_string()) {
+            Ok(ids) if !ids.is_empty() => self.send(Cmd::ApplyGrouping(ids)),
+            Ok(_) => {}
+            Err(e) => tracing::warn!("applyGrouping: bad ids payload: {e}"),
+        }
     }
 }

@@ -27,6 +27,8 @@ pub enum Cmd {
     Search(String),
     LoadMore,
     PlayFromHere(u64),
+    GroupInfo,
+    ApplyGrouping(Vec<String>),
 }
 
 const PAGE_SIZE: u32 = 100;
@@ -440,6 +442,9 @@ async fn session(
     let mut queue_rx: Option<tokio::sync::mpsc::Receiver<QueueEvent>> = None;
     let mut queue_key: Option<u32> = None;
     let mut queue_zone: Option<String> = None;
+    // Grouping/ungrouping dissolves zone ids; keep following the output that
+    // anchored our selection into whatever zone it re-forms in.
+    let mut follow_output: Option<String> = None;
 
     // Re-point the queue subscription at the currently selected zone,
     // unsubscribing the old one so the core can free it.
@@ -499,10 +504,21 @@ async fn session(
 
                 zones.sort_by(|a, b| a.display_name.cmp(&b.display_name));
                 if sel_id.as_deref().map_or(true, |id| !zones.iter().any(|z| z.zone_id == id)) {
-                    sel_id = zones.first().map(|z| z.zone_id.clone());
+                    sel_id = follow_output
+                        .as_ref()
+                        .and_then(|oid| {
+                            zones
+                                .iter()
+                                .find(|z| z.outputs.iter().any(|o| &o.output_id == oid))
+                                .map(|z| z.zone_id.clone())
+                        })
+                        .or_else(|| zones.first().map(|z| z.zone_id.clone()));
                 }
                 let sel = zones.iter().position(|z| Some(z.zone_id.as_str()) == sel_id.as_deref()).unwrap_or(0);
                 let zone = zones.get(sel);
+                if let Some(z) = zone {
+                    follow_output = z.outputs.first().map(|o| o.output_id.clone());
+                }
 
                 if seek_only {
                     if let Some(pos) = zone.and_then(|z| z.seek_position) {
@@ -579,6 +595,67 @@ async fn session(
                         Some(z) => transport.play_from_here(&z.zone_id, id).await,
                         None => Ok(()),
                     },
+                    Cmd::GroupInfo => {
+                        let cur_ids: Vec<&str> = zone
+                            .map(|z| z.outputs.iter().map(|o| o.output_id.as_str()).collect())
+                            .unwrap_or_default();
+                        let compat: Vec<&str> = zone
+                            .and_then(|z| z.outputs.first())
+                            .map(|o| o.can_group_with_output_ids.iter().map(String::as_str).collect())
+                            .unwrap_or_default();
+                        let json = serde_json::Value::Array(
+                            zones
+                                .iter()
+                                .flat_map(|z| z.outputs.iter().map(move |o| (z, o)))
+                                .map(|(z, o)| {
+                                    let in_current = cur_ids.contains(&o.output_id.as_str());
+                                    serde_json::json!({
+                                        "outputId": o.output_id,
+                                        "name": o.display_name,
+                                        "zoneName": z.display_name,
+                                        "inCurrent": in_current,
+                                        "canGroup": in_current
+                                            || compat.is_empty()
+                                            || compat.contains(&o.output_id.as_str()),
+                                    })
+                                })
+                                .collect(),
+                        )
+                        .to_string();
+                        push(qt, move |mut app| {
+                            app.as_mut().group_info(QString::from(&json));
+                        });
+                        Ok(())
+                    }
+                    Cmd::ApplyGrouping(keep) => {
+                        let cur: Vec<String> = zone
+                            .map(|z| z.outputs.iter().map(|o| o.output_id.clone()).collect())
+                            .unwrap_or_default();
+                        // Keep the current zone's ordering (primary output first),
+                        // then append newly added outputs.
+                        let kept: Vec<&str> = cur
+                            .iter()
+                            .filter(|id| keep.contains(id))
+                            .chain(keep.iter().filter(|id| !cur.contains(id)))
+                            .map(String::as_str)
+                            .collect();
+                        let removed: Vec<&str> = cur
+                            .iter()
+                            .filter(|id| !keep.contains(id))
+                            .map(String::as_str)
+                            .collect();
+                        let has_added = keep.iter().any(|id| !cur.contains(id));
+
+                        follow_output = kept.first().map(|s| s.to_string());
+                        let mut result = Ok(());
+                        if !removed.is_empty() {
+                            result = transport.ungroup_outputs(&removed).await;
+                        }
+                        if result.is_ok() && has_added && kept.len() >= 2 {
+                            result = transport.group_outputs(&kept).await;
+                        }
+                        result
+                    }
                     Cmd::PlayPause => match zone {
                         Some(z) => transport.control(&z.zone_id, ControlAction::PlayPause).await,
                         None => Ok(()),

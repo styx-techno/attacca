@@ -9,5 +9,6 @@
         <file alias="search.svg">assets/search.svg</file>
         <file alias="volume.svg">assets/volume.svg</file>
         <file alias="note.svg">assets/note.svg</file>
+        <file alias="link.svg">assets/link.svg</file>
     </qresource>
 </RCC>

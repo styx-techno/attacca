@@ -105,10 +105,60 @@ ApplicationWindow {
             for (const it of items)
                 queueModel.append(it)
         }
+
+        onGroupInfo: json => {
+            const outputs = JSON.parse(json)
+            groupModel.clear()
+            for (const o of outputs)
+                groupModel.append({
+                    outputId: o.outputId,
+                    name: o.name,
+                    zoneName: o.zoneName,
+                    canGroup: o.canGroup,
+                    checked: o.inCurrent
+                })
+            groupDialog.open()
+        }
     }
 
     ListModel { id: browseModel }
     ListModel { id: queueModel }
+    ListModel { id: groupModel }
+
+    Dialog {
+        id: groupDialog
+        modal: true
+        title: "Group zones"
+        anchors.centerIn: parent
+        width: Math.min(420, root.width - 48)
+        height: Math.min(120 + groupModel.count * 48, root.height - 96)
+        standardButtons: Dialog.Apply | Dialog.Cancel
+
+        onApplied: {
+            const ids = []
+            for (let i = 0; i < groupModel.count; i++)
+                if (groupModel.get(i).checked)
+                    ids.push(groupModel.get(i).outputId)
+            if (ids.length > 0)
+                app.applyGrouping(JSON.stringify(ids))
+            close()
+        }
+
+        ListView {
+            anchors.fill: parent
+            clip: true
+            model: groupModel
+
+            delegate: CheckDelegate {
+                width: ListView.view.width
+                text: model.name + (model.zoneName !== model.name
+                                    ? "  ·  " + model.zoneName : "")
+                checked: model.checked
+                enabled: model.canGroup
+                onToggled: groupModel.setProperty(index, "checked", checked)
+            }
+        }
+    }
 
     function fmt(s) {
         s = Math.max(0, Math.round(s))
@@ -198,13 +248,28 @@ ApplicationWindow {
             anchors.fill: parent
             spacing: 14
 
-            ComboBox {
+            RowLayout {
                 Layout.fillWidth: true
                 Layout.margins: 24
                 Layout.bottomMargin: 0
-                model: app.zoneList
-                currentIndex: app.zoneIndex
-                onActivated: index => app.selectZone(index)
+                spacing: 8
+
+                ComboBox {
+                    Layout.fillWidth: true
+                    model: app.zoneList
+                    currentIndex: app.zoneIndex
+                    onActivated: index => app.selectZone(index)
+                }
+
+                ToolButton {
+                    icon.source: "qrc:/icons/link.svg"
+                    icon.width: 20
+                    icon.height: 20
+                    icon.color: "#c9cad4"
+                    ToolTip.visible: hovered
+                    ToolTip.text: "Group zones"
+                    onClicked: app.requestGroupInfo()
+                }
             }
 
             Item {
