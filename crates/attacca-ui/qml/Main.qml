@@ -76,6 +76,18 @@ ApplicationWindow {
             app.loadMore()
     }
 
+    // Flickable's built-in wheel handling is tuned for touch physics and
+    // crawls on a desktop mouse wheel; scroll a real step per notch instead.
+    // Touchpads deliver pixelDelta and keep their smooth native feel.
+    function wheelScroll(view, event) {
+        view.cancelFlick()
+        const dy = event.pixelDelta.y !== 0 ? event.pixelDelta.y
+                                            : event.angleDelta.y * 1.6
+        const maxY = view.originY + Math.max(0, view.contentHeight - view.height)
+        view.contentY = Math.max(view.originY, Math.min(maxY, view.contentY - dy))
+        event.accepted = true
+    }
+
     footer: TabBar {
         id: tabs
         visible: app.connectionState === "connected"
@@ -331,6 +343,12 @@ ApplicationWindow {
 
                 ScrollBar.vertical: ScrollBar {}
 
+                WheelHandler {
+                    acceptedDevices: PointerDevice.Mouse
+                    target: null
+                    onWheel: event => root.wheelScroll(grid, event)
+                }
+
                 delegate: Item {
                     width: grid.cellWidth
                     height: grid.cellHeight
@@ -387,6 +405,12 @@ ApplicationWindow {
                 onAtYEndChanged: if (atYEnd) maybeLoadMore()
 
                 ScrollBar.vertical: ScrollBar {}
+
+                WheelHandler {
+                    acceptedDevices: PointerDevice.Mouse
+                    target: null
+                    onWheel: event => root.wheelScroll(list, event)
+                }
 
                 delegate: ItemDelegate {
                     width: list.width
