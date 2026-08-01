@@ -80,18 +80,25 @@ ApplicationWindow {
     // crawls on a desktop mouse wheel; scroll a real step per notch instead.
     // Trust angleDelta: on Wayland a mouse wheel ALSO carries a tiny
     // pixelDelta (~15px per notch from libinput), which must not win.
-    property bool wheelLogged: false
-    function wheelScroll(view, event) {
-        if (!root.wheelLogged) {
-            root.wheelLogged = true
-            console.log("wheel: angleDelta", event.angleDelta.y,
-                        "pixelDelta", event.pixelDelta.y)
-        }
+    // Full notches glide via `anim` (the target accumulates, so fast spinning
+    // keeps momentum); sub-notch deltas from touchpads/free-spin wheels are
+    // applied directly to preserve their native smoothness.
+    function wheelScroll(view, anim, event) {
         view.cancelFlick()
-        const notches = event.angleDelta.y / 120
-        const dy = notches !== 0 ? notches * 240 : event.pixelDelta.y
         const maxY = view.originY + Math.max(0, view.contentHeight - view.height)
-        view.contentY = Math.max(view.originY, Math.min(maxY, view.contentY - dy))
+        const clamp = y => Math.max(view.originY, Math.min(maxY, y))
+        const dy = event.angleDelta.y !== 0 ? event.angleDelta.y / 120 * 240
+                                            : event.pixelDelta.y
+        if (Math.abs(event.angleDelta.y) >= 120) {
+            const base = anim.running ? anim.to : view.contentY
+            anim.stop()
+            anim.from = view.contentY
+            anim.to = clamp(base - dy)
+            anim.start()
+        } else {
+            anim.stop()
+            view.contentY = clamp(view.contentY - dy)
+        }
         event.accepted = true
     }
 
@@ -350,6 +357,7 @@ ApplicationWindow {
                 cellWidth: Math.floor(width / Math.max(2, Math.floor(width / 176)))
                 cellHeight: cellWidth + 46
                 onAtYEndChanged: if (atYEnd) maybeLoadMore()
+                onDraggingChanged: if (dragging) gridAnim.stop()
 
                 ScrollBar.vertical: ScrollBar {}
 
@@ -399,10 +407,18 @@ ApplicationWindow {
                 }
                 }
 
+                NumberAnimation {
+                    id: gridAnim
+                    target: grid
+                    property: "contentY"
+                    duration: 160
+                    easing.type: Easing.OutCubic
+                }
+
                 MouseArea {
                     anchors.fill: parent
                     acceptedButtons: Qt.NoButton
-                    onWheel: wheel => root.wheelScroll(grid, wheel)
+                    onWheel: wheel => root.wheelScroll(grid, gridAnim, wheel)
                 }
             }
 
@@ -417,6 +433,7 @@ ApplicationWindow {
                 clip: true
                 model: root.gridMode ? null : browseModel
                 onAtYEndChanged: if (atYEnd) maybeLoadMore()
+                onDraggingChanged: if (dragging) listAnim.stop()
 
                 ScrollBar.vertical: ScrollBar {}
 
@@ -472,10 +489,18 @@ ApplicationWindow {
                 }
             }
 
+                NumberAnimation {
+                    id: listAnim
+                    target: list
+                    property: "contentY"
+                    duration: 160
+                    easing.type: Easing.OutCubic
+                }
+
                 MouseArea {
                     anchors.fill: parent
                     acceptedButtons: Qt.NoButton
-                    onWheel: wheel => root.wheelScroll(list, wheel)
+                    onWheel: wheel => root.wheelScroll(list, listAnim, wheel)
                 }
             }
         }
