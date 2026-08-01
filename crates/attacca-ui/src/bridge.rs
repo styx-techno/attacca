@@ -36,7 +36,25 @@ pub mod qobject {
         #[qproperty(f64, volume)]
         #[qproperty(f64, volume_min, cxx_name = "volumeMin")]
         #[qproperty(f64, volume_max, cxx_name = "volumeMax")]
+        #[qproperty(QString, image_base, cxx_name = "imageBase")]
+        #[qproperty(bool, browse_busy, cxx_name = "browseBusy")]
         type App = super::AppRust;
+
+        /// Emitted when the browse view changes to a new list; the UI should
+        /// clear its model. `in_search` marks the search hierarchy.
+        #[qsignal]
+        #[cxx_name = "browseReset"]
+        fn browse_reset(self: Pin<&mut App>, title: QString, level: i32, count: i32, in_search: bool);
+
+        /// A JSON array of items to append to the browse model:
+        /// [{title, subtitle, imageKey, itemKey, hint}, …]
+        #[qsignal]
+        #[cxx_name = "browseItems"]
+        fn browse_items(self: Pin<&mut App>, items_json: QString);
+
+        /// Transient user-facing notification.
+        #[qsignal]
+        fn toast(self: Pin<&mut App>, message: QString);
 
         /// Start discovery + the worker thread. Idempotent; call from QML once.
         #[qinvokable]
@@ -63,6 +81,25 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "seekTo"]
         fn seek_to(self: Pin<&mut Self>, seconds: f64);
+
+        #[qinvokable]
+        #[cxx_name = "browseHome"]
+        fn browse_home(self: Pin<&mut Self>);
+
+        #[qinvokable]
+        #[cxx_name = "browseInto"]
+        fn browse_into(self: Pin<&mut Self>, item_key: &QString);
+
+        #[qinvokable]
+        #[cxx_name = "browseBack"]
+        fn browse_back(self: Pin<&mut Self>);
+
+        #[qinvokable]
+        fn search(self: Pin<&mut Self>, text: &QString);
+
+        #[qinvokable]
+        #[cxx_name = "loadMore"]
+        fn load_more(self: Pin<&mut Self>);
     }
 
     impl cxx_qt::Threading for App {}
@@ -90,6 +127,8 @@ pub struct AppRust {
     volume: f64,
     volume_min: f64,
     volume_max: f64,
+    image_base: QString,
+    browse_busy: bool,
 }
 
 impl Default for AppRust {
@@ -113,6 +152,8 @@ impl Default for AppRust {
             volume: 0.0,
             volume_min: 0.0,
             volume_max: 100.0,
+            image_base: QString::default(),
+            browse_busy: false,
         }
     }
 }
@@ -158,5 +199,28 @@ impl qobject::App {
 
     pub fn seek_to(self: Pin<&mut Self>, seconds: f64) {
         self.send(Cmd::Seek(seconds));
+    }
+
+    pub fn browse_home(self: Pin<&mut Self>) {
+        self.send(Cmd::BrowseHome);
+    }
+
+    pub fn browse_into(self: Pin<&mut Self>, item_key: &QString) {
+        self.send(Cmd::BrowseInto(item_key.to_string()));
+    }
+
+    pub fn browse_back(self: Pin<&mut Self>) {
+        self.send(Cmd::BrowseBack);
+    }
+
+    pub fn search(self: Pin<&mut Self>, text: &QString) {
+        let text = text.to_string();
+        if !text.trim().is_empty() {
+            self.send(Cmd::Search(text));
+        }
+    }
+
+    pub fn load_more(self: Pin<&mut Self>) {
+        self.send(Cmd::LoadMore);
     }
 }

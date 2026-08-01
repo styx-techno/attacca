@@ -33,6 +33,7 @@ pub fn build_client() -> anyhow::Result<RoonClient> {
     let client = RoonClientBuilder::new(EXTENSION_ID, DISPLAY_NAME, VERSION, PUBLISHER, EMAIL)
         .token_store(FileTokenStore::new(token_store_path()))
         .require_transport()
+        .require_browse()
         .build()?;
     Ok(client)
 }

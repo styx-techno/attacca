@@ -69,6 +69,8 @@ dependencies = [
  "cxx-qt-build",
  "cxx-qt-lib",
  "dirs-next",
+ "roon-sood",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",

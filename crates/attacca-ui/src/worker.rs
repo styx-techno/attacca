@@ -2,10 +2,14 @@
 //! state into the QObject via `CxxQtThread::queue`.
 
 use crate::bridge::qobject::App;
-use attacca_core::{ControlAction, Core, RoonEvent, SeekMode, VolumeMode, Zone, ZoneEvent};
+use attacca_core::{
+    Browse, BrowseOptions, BrowseResult, ControlAction, Core, LoadOptions, RoonEvent, SeekMode,
+    VolumeMode, Zone, ZoneEvent,
+};
 use core::pin::Pin;
 use cxx_qt::CxxQtThread;
 use cxx_qt_lib::{QList, QString, QStringList};
+use std::collections::HashMap;
 use tokio::sync::mpsc::UnboundedReceiver;
 
 #[derive(Debug)]
@@ -16,7 +20,14 @@ pub enum Cmd {
     Previous,
     SetVolume(f64),
     Seek(f64),
+    BrowseHome,
+    BrowseInto(String),
+    BrowseBack,
+    Search(String),
+    LoadMore,
 }
+
+const PAGE_SIZE: u32 = 100;
 
 pub fn run(qt: CxxQtThread<App>, rx: UnboundedReceiver<Cmd>) {
     let rt = match tokio::runtime::Builder::new_multi_thread()
@@ -31,6 +42,7 @@ pub fn run(qt: CxxQtThread<App>, rx: UnboundedReceiver<Cmd>) {
         }
     };
     if let Err(e) = rt.block_on(main_loop(&qt, rx)) {
+        tracing::error!("worker exited: {e}");
         set_state(&qt, &format!("error: {e}"));
     }
 }
@@ -49,30 +61,73 @@ fn set_state(qt: &CxxQtThread<App>, state: &str) {
     });
 }
 
+/// One-shot SOOD scan for core addresses, used for direct artwork URLs
+/// (`http://<core>:<port>/api/image/<key>`), which the paired client API does
+/// not expose. Must complete BEFORE the client's own discovery starts: two
+/// concurrent sockets on UDP 9003 with SO_REUSEPORT split unicast replies
+/// between them, silently starving the client of discovery responses.
+async fn prescan_cores() -> HashMap<String, (String, u16)> {
+    let mut map = HashMap::new();
+    let Ok((discovery, mut rx)) = roon_sood::SoodDiscovery::start().await else {
+        tracing::warn!("SOOD prescan failed; artwork thumbnails disabled");
+        return map;
+    };
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(3);
+    loop {
+        match tokio::time::timeout_at(deadline, rx.recv()).await {
+            Ok(Ok(core)) => {
+                map.insert(core.core_id, (core.host.to_string(), core.http_port));
+            }
+            Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => continue,
+            _ => break,
+        }
+    }
+    discovery.stop().await;
+    tracing::info!("SOOD prescan found {} core(s)", map.len());
+    map
+}
+
+/// Discover via a short SOOD scan, then connect DIRECTLY to the core's
+/// WebSocket. We never run the client's own discovery: Roon Bridge on the
+/// same machine holds several UDP 9003 sockets, and with SO_REUSEPORT the
+/// core's unicast replies land on only one 9003 socket — often not ours.
+/// One short prescan is enough; the address is then used explicitly.
 async fn main_loop(qt: &CxxQtThread<App>, mut rx: UnboundedReceiver<Cmd>) -> anyhow::Result<()> {
     let client = attacca_core::build_client()?;
     let mut events = client.events();
 
-    set_state(qt, "discovering");
-    client.start_discovery().await?;
-
     loop {
-        match events.recv().await? {
-            RoonEvent::CoreFound { .. } => set_state(qt, "pairing"),
-            RoonEvent::CorePaired(core) => {
-                let name = core.display_name().to_owned();
-                tracing::info!("paired with core \"{name}\" ({})", core.display_version());
-                push(qt, move |mut app| {
-                    app.as_mut().set_core_name(QString::from(&name));
-                    app.as_mut().set_connection_state(QString::from("connected"));
-                });
-                // Runs until the core is lost/unpaired, then we fall back to waiting.
-                if let Err(e) = session(core, &mut events, &mut rx, qt).await {
-                    tracing::warn!("session ended: {e}");
-                }
-                set_state(qt, "discovering");
+        set_state(qt, "discovering");
+        let Some((host, port)) = prescan_cores().await.into_values().next() else {
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+            continue;
+        };
+
+        // connect() registers and, on first run, waits for the user to
+        // enable the extension in Roon — hence the "pairing" state.
+        set_state(qt, "pairing");
+        let core = match client.connect(&host, port).await {
+            Ok(core) => core,
+            Err(e) => {
+                tracing::warn!("connect to {host}:{port} failed: {e}");
+                set_state(qt, "retrying");
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                continue;
             }
-            _ => {}
+        };
+
+        let name = core.display_name().to_owned();
+        tracing::info!("paired with core \"{name}\" ({})", core.display_version());
+        let base = format!("http://{host}:{port}/api/image/");
+        push(qt, move |mut app| {
+            app.as_mut().set_core_name(QString::from(&name));
+            app.as_mut().set_image_base(QString::from(&base));
+            app.as_mut().set_connection_state(QString::from("connected"));
+        });
+
+        // Runs until the core connection drops, then we rediscover.
+        if let Err(e) = session(core, &mut events, &mut rx, qt).await {
+            tracing::warn!("session ended: {e}");
         }
     }
 }
@@ -180,6 +235,124 @@ fn update_art(qt: &CxxQtThread<App>, core: &Core, key: Option<&str>, last: &mut 
     });
 }
 
+/// Server-side browse session state. One session, one hierarchy at a time:
+/// "browse" for navigation, "search" for search results.
+struct BrowseCtx {
+    svc: Browse,
+    hierarchy: String,
+    count: u32,
+    loaded: u32,
+}
+
+impl BrowseCtx {
+    /// Apply a browse() result: new list → reset UI model and load page one;
+    /// message → toast. Other actions (none/replace/remove) are ignored for now.
+    async fn apply(&mut self, qt: &CxxQtThread<App>, result: BrowseResult) -> anyhow::Result<()> {
+        match result.action.as_str() {
+            "list" => {
+                let Some(list) = result.list else {
+                    return Ok(());
+                };
+                self.count = list.count;
+                self.loaded = 0;
+                tracing::info!(
+                    "browse: list \"{}\" (level {}, {} items)",
+                    list.title,
+                    list.level,
+                    list.count
+                );
+                let title = list.title.clone();
+                let level = list.level as i32;
+                let count = list.count as i32;
+                let in_search = self.hierarchy == "search";
+                push(qt, move |mut app| {
+                    app.as_mut().browse_reset(QString::from(&title), level, count, in_search);
+                });
+                self.load_page(qt).await?;
+            }
+            "message" => {
+                let msg = result.item.map(|i| i.title).unwrap_or_else(|| "Done".into());
+                push(qt, move |mut app| {
+                    app.as_mut().toast(QString::from(&msg));
+                });
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
+    async fn load_page(&mut self, qt: &CxxQtThread<App>) -> anyhow::Result<()> {
+        if self.loaded >= self.count {
+            return Ok(());
+        }
+        let result = self
+            .svc
+            .load(LoadOptions {
+                hierarchy: Some(self.hierarchy.clone()),
+                offset: Some(self.loaded),
+                count: Some(PAGE_SIZE),
+                ..Default::default()
+            })
+            .await?;
+        self.loaded += result.items.len() as u32;
+        tracing::info!("browse: loaded {} item(s) ({}/{})", result.items.len(), self.loaded, self.count);
+        if result.items.is_empty() {
+            // Defensive: never loop forever on a misbehaving list.
+            self.loaded = self.count;
+            return Ok(());
+        }
+
+        let json = serde_json::Value::Array(
+            result
+                .items
+                .iter()
+                .map(|it| {
+                    serde_json::json!({
+                        "title": it.title,
+                        "subtitle": it.subtitle.clone().unwrap_or_default(),
+                        "imageKey": it.image_key.clone().unwrap_or_default(),
+                        "itemKey": it.item_key.clone().unwrap_or_default(),
+                        "hint": it.hint.clone().unwrap_or_default(),
+                    })
+                })
+                .collect(),
+        )
+        .to_string();
+        push(qt, move |mut app| {
+            app.as_mut().browse_items(QString::from(&json));
+        });
+        Ok(())
+    }
+
+    /// browse() with busy indication and error tolerance; applies the result.
+    async fn go(&mut self, qt: &CxxQtThread<App>, opts: BrowseOptions) {
+        push(qt, |mut app| app.as_mut().set_browse_busy(true));
+        match self.svc.browse(opts).await {
+            Ok(result) => {
+                if let Err(e) = self.apply(qt, result).await {
+                    tracing::warn!("browse apply failed: {e}");
+                }
+            }
+            Err(e) => tracing::warn!("browse failed: {e}"),
+        }
+        push(qt, |mut app| app.as_mut().set_browse_busy(false));
+    }
+
+    async fn home(&mut self, qt: &CxxQtThread<App>, zone_id: Option<String>) {
+        self.hierarchy = "browse".to_owned();
+        self.go(
+            qt,
+            BrowseOptions {
+                hierarchy: Some("browse".into()),
+                pop_all: Some(true),
+                zone_or_output_id: zone_id,
+                ..Default::default()
+            },
+        )
+        .await;
+    }
+}
+
 async fn session(
     core: Core,
     events: &mut tokio::sync::broadcast::Receiver<RoonEvent>,
@@ -192,6 +365,13 @@ async fn session(
     let mut zones: Vec<Zone> = Vec::new();
     let mut sel_id: Option<String> = None;
     let mut last_art: Option<String> = None;
+    let mut browse = BrowseCtx {
+        svc: core.browse(),
+        hierarchy: "browse".to_owned(),
+        count: 0,
+        loaded: 0,
+    };
+    let mut did_home = false;
 
     loop {
         tokio::select! {
@@ -241,6 +421,11 @@ async fn session(
                         .and_then(|np| np.image_key.as_deref());
                     update_art(qt, &core, key, &mut last_art);
                 }
+
+                if !did_home {
+                    did_home = true;
+                    browse.home(qt, sel_id.clone()).await;
+                }
             }
 
             cmd = rx.recv() => {
@@ -279,6 +464,48 @@ async fn session(
                         Some(z) => transport.seek(&z.zone_id, SeekMode::Absolute, s as i64).await,
                         None => Ok(()),
                     },
+                    Cmd::BrowseHome => {
+                        browse.home(qt, sel_id.clone()).await;
+                        Ok(())
+                    }
+                    Cmd::BrowseInto(item_key) => {
+                        let opts = BrowseOptions {
+                            hierarchy: Some(browse.hierarchy.clone()),
+                            item_key: Some(item_key),
+                            zone_or_output_id: sel_id.clone(),
+                            ..Default::default()
+                        };
+                        browse.go(qt, opts).await;
+                        Ok(())
+                    }
+                    Cmd::BrowseBack => {
+                        let opts = BrowseOptions {
+                            hierarchy: Some(browse.hierarchy.clone()),
+                            pop_levels: Some(1),
+                            zone_or_output_id: sel_id.clone(),
+                            ..Default::default()
+                        };
+                        browse.go(qt, opts).await;
+                        Ok(())
+                    }
+                    Cmd::Search(query) => {
+                        browse.hierarchy = "search".to_owned();
+                        let opts = BrowseOptions {
+                            hierarchy: Some("search".into()),
+                            input: Some(query),
+                            pop_all: Some(true),
+                            zone_or_output_id: sel_id.clone(),
+                            ..Default::default()
+                        };
+                        browse.go(qt, opts).await;
+                        Ok(())
+                    }
+                    Cmd::LoadMore => {
+                        if let Err(e) = browse.load_page(qt).await {
+                            tracing::warn!("load more failed: {e}");
+                        }
+                        Ok(())
+                    }
                 };
                 if let Err(e) = result {
                     tracing::warn!("command failed: {e}");
