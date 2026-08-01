@@ -88,8 +88,8 @@ where
     F: FnOnce(attacca_core::Core) -> Fut,
     Fut: std::future::Future<Output = anyhow::Result<()>>,
 {
-    println!("Token store: {}", attacca_core::token_store_path().display());
-    let client = attacca_core::build_client()?;
+    println!("Token store: {}", attacca_core::cli_token_store_path().display());
+    let client = attacca_core::build_cli_client()?;
     let mut events = client.events();
 
     if let (Some(host), Some(port)) = (host, port) {
@@ -98,7 +98,7 @@ where
         return f(core).await;
     }
 
-    println!("Discovering Roon Core… (first run: approve \"Attacca\" in Roon Settings → Extensions)");
+    println!("Discovering Roon Core… (first run: approve \"Attacca CLI\" in Roon Settings → Extensions)");
     client.start_discovery().await?;
     loop {
         match events.recv().await? {
@@ -183,7 +183,8 @@ fn print_zone(zone: &Zone) {
             .as_ref()
             .map(|v| format!("  vol {}/{}", v.value, v.max))
             .unwrap_or_default();
-        println!("    ↳ {}{vol}", output.display_name);
+        println!("    ↳ {} ({}){vol}", output.display_name, output.output_id);
+        println!("      can group with: {:?}", output.can_group_with_output_ids);
     }
     if let Some(np) = &zone.now_playing {
         println!("    ♪ {}", np.one_line.line1);

@@ -20,19 +20,39 @@ pub const PUBLISHER: &str = "Attacca contributors";
 pub const EMAIL: &str = "max.uckrow@gmx.de";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Pairing tokens live in `~/.config/attacca/tokens.json`.
+/// Pairing tokens live in `~/.config/attacca/<file>`.
 pub fn token_store_path() -> PathBuf {
+    config_file("tokens.json")
+}
+
+/// The CLI authorizes as its own extension so debug sessions never fight the
+/// running app over one Core-side connection (same-identity connections get
+/// reset by the Core).
+pub fn cli_token_store_path() -> PathBuf {
+    config_file("tokens-cli.json")
+}
+
+fn config_file(name: &str) -> PathBuf {
     dirs_next::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
         .join("attacca")
-        .join("tokens.json")
+        .join(name)
 }
 
-/// A `RoonClient` announcing the Attacca identity, with transport enabled and
-/// tokens persisted, ready for `start_discovery()` or `connect(host, port)`.
+/// A `RoonClient` announcing the Attacca app identity, with transport+browse
+/// enabled and tokens persisted, ready for discovery or `connect(host, port)`.
 pub fn build_client() -> anyhow::Result<RoonClient> {
-    let client = RoonClientBuilder::new(EXTENSION_ID, DISPLAY_NAME, VERSION, PUBLISHER, EMAIL)
-        .token_store(FileTokenStore::new(token_store_path()))
+    build_named(EXTENSION_ID, DISPLAY_NAME, token_store_path())
+}
+
+/// Client for the debug CLI under its own extension identity.
+pub fn build_cli_client() -> anyhow::Result<RoonClient> {
+    build_named("org.attacca.cli", "Attacca CLI", cli_token_store_path())
+}
+
+fn build_named(id: &str, name: &str, tokens: PathBuf) -> anyhow::Result<RoonClient> {
+    let client = RoonClientBuilder::new(id, name, VERSION, PUBLISHER, EMAIL)
+        .token_store(FileTokenStore::new(tokens))
         .require_transport()
         .require_browse()
         .build()?;

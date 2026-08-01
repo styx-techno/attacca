@@ -144,18 +144,39 @@ ApplicationWindow {
             close()
         }
 
-        ListView {
+        ColumnLayout {
             anchors.fill: parent
-            clip: true
-            model: groupModel
+            spacing: 8
 
-            delegate: CheckDelegate {
-                width: ListView.view.width
-                text: model.name + (model.zoneName !== model.name
-                                    ? "  ·  " + model.zoneName : "")
-                checked: model.checked
-                enabled: model.canGroup
-                onToggled: groupModel.setProperty(index, "checked", checked)
+            ListView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                model: groupModel
+
+                delegate: CheckDelegate {
+                    width: ListView.view.width
+                    text: model.name + (model.zoneName !== model.name
+                                        ? "  ·  " + model.zoneName : "")
+                    checked: model.checked
+                    enabled: model.canGroup
+                    onToggled: groupModel.setProperty(index, "checked", checked)
+                }
+            }
+
+            Label {
+                Layout.fillWidth: true
+                visible: {
+                    for (let i = 0; i < groupModel.count; i++)
+                        if (!groupModel.get(i).canGroup)
+                            return true
+                    return false
+                }
+                wrapMode: Text.WordWrap
+                font.pixelSize: 12
+                color: "#7c7d88"
+                text: "Greyed-out outputs use a different audio protocol — "
+                      + "Roon can only group matching outputs (e.g. RAAT with RAAT)."
             }
         }
     }
