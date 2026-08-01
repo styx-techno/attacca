@@ -130,8 +130,11 @@ ApplicationWindow {
         modal: true
         title: "Group zones"
         anchors.centerIn: parent
-        width: Math.min(420, root.width - 48)
-        height: Math.min(120 + groupModel.count * 48, root.height - 96)
+        // Grow with the list, but never past the window. contentHeight comes
+        // from the layout's implicit height, so header, footer and footnote
+        // are accounted for by Dialog itself.
+        width: Math.min(460, root.width - 48)
+        contentHeight: Math.min(groupLayout.implicitHeight, root.height - 200)
         standardButtons: Dialog.Apply | Dialog.Cancel
 
         onApplied: {
@@ -145,22 +148,50 @@ ApplicationWindow {
         }
 
         ColumnLayout {
+            id: groupLayout
             anchors.fill: parent
             spacing: 8
 
             ListView {
+                id: groupList
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.preferredHeight: contentHeight
                 clip: true
                 model: groupModel
+                boundsBehavior: Flickable.StopAtBounds
+
+                ScrollBar.vertical: ScrollBar {
+                    policy: groupList.contentHeight > groupList.height
+                            ? ScrollBar.AlwaysOn : ScrollBar.AsNeeded
+                }
 
                 delegate: CheckDelegate {
-                    width: ListView.view.width
-                    text: model.name + (model.zoneName !== model.name
-                                        ? "  ·  " + model.zoneName : "")
+                    id: groupDelegate
+                    width: groupList.width - (groupList.ScrollBar.vertical.visible
+                                              ? groupList.ScrollBar.vertical.width : 0)
                     checked: model.checked
                     enabled: model.canGroup
                     onToggled: groupModel.setProperty(index, "checked", checked)
+
+                    contentItem: ColumnLayout {
+                        spacing: 0
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: model.name
+                            elide: Text.ElideRight
+                            color: groupDelegate.enabled ? "#e8e8ee" : "#5a5b65"
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            text: model.zoneName
+                            font.pixelSize: 11
+                            color: "#7c7d88"
+                            elide: Text.ElideRight
+                            visible: model.zoneName !== model.name
+                        }
+                    }
                 }
             }
 
