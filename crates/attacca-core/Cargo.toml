@@ -1,0 +1,12 @@
+[package]
+name = "attacca-core"
+description = "Core session layer for Attacca, a native Roon client for Linux"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+roon-api = { workspace = true }
+anyhow = { workspace = true }
+dirs-next = { workspace = true }

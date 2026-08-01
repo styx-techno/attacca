@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["crates/attacca-core", "crates/attacca-cli"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/CHANGEME/attacca"
+
+[workspace.dependencies]
+roon-api = "0.5"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time"] }
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dirs-next = "2"
