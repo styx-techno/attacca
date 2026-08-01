@@ -9,8 +9,9 @@ use attacca_core::{
 use core::pin::Pin;
 use cxx_qt::CxxQtThread;
 use cxx_qt_lib::{QList, QString, QStringList};
+use crate::mpris::{self, MprisServer, NowPlaying as MprisNow};
 use std::collections::HashMap;
-use tokio::sync::mpsc::UnboundedReceiver;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[derive(Debug)]
 pub enum Cmd {
@@ -30,7 +31,7 @@ pub enum Cmd {
 
 const PAGE_SIZE: u32 = 100;
 
-pub fn run(qt: CxxQtThread<App>, rx: UnboundedReceiver<Cmd>) {
+pub fn run(qt: CxxQtThread<App>, cmd_tx: UnboundedSender<Cmd>, rx: UnboundedReceiver<Cmd>) {
     let rt = match tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .enable_all()
@@ -42,7 +43,7 @@ pub fn run(qt: CxxQtThread<App>, rx: UnboundedReceiver<Cmd>) {
             return;
         }
     };
-    if let Err(e) = rt.block_on(main_loop(&qt, rx)) {
+    if let Err(e) = rt.block_on(main_loop(&qt, cmd_tx, rx)) {
         tracing::error!("worker exited: {e}");
         set_state(&qt, &format!("error: {e}"));
     }
@@ -93,9 +94,17 @@ async fn prescan_cores() -> HashMap<String, (String, u16)> {
 /// same machine holds several UDP 9003 sockets, and with SO_REUSEPORT the
 /// core's unicast replies land on only one 9003 socket — often not ours.
 /// One short prescan is enough; the address is then used explicitly.
-async fn main_loop(qt: &CxxQtThread<App>, mut rx: UnboundedReceiver<Cmd>) -> anyhow::Result<()> {
+async fn main_loop(
+    qt: &CxxQtThread<App>,
+    cmd_tx: UnboundedSender<Cmd>,
+    mut rx: UnboundedReceiver<Cmd>,
+) -> anyhow::Result<()> {
     let client = attacca_core::build_client()?;
     let mut events = client.events();
+    let mpris_server = mpris::serve(cmd_tx).await;
+    if mpris_server.is_some() {
+        tracing::info!("MPRIS registered as org.mpris.MediaPlayer2.attacca");
+    }
 
     loop {
         set_state(qt, "discovering");
@@ -127,14 +136,14 @@ async fn main_loop(qt: &CxxQtThread<App>, mut rx: UnboundedReceiver<Cmd>) -> any
         });
 
         // Runs until the core connection drops, then we rediscover.
-        if let Err(e) = session(core, &mut events, &mut rx, qt).await {
+        if let Err(e) = session(core, &mut events, &mut rx, qt, &mpris_server).await {
             tracing::warn!("session ended: {e}");
         }
     }
 }
 
 /// Everything the UI shows about the selected zone.
-fn push_view(qt: &CxxQtThread<App>, zone: Option<&Zone>) {
+fn push_view(qt: &CxxQtThread<App>, zone: Option<&Zone>, mpris_server: &Option<MprisServer>) {
     let (title, artist, album) = zone
         .and_then(|z| z.now_playing.as_ref())
         .map(|np| match &np.three_line {
@@ -160,6 +169,25 @@ fn push_view(qt: &CxxQtThread<App>, zone: Option<&Zone>) {
         Some(v) => (true, v.value, v.min, v.max),
         None => (false, 0.0, 0.0, 100.0),
     };
+
+    mpris::update(
+        mpris_server,
+        MprisNow {
+            title: title.clone(),
+            artist: artist.clone(),
+            album: album.clone(),
+            art_url: String::new(),
+            play_state: play_state.clone(),
+            length_us: (len * 1_000_000.0) as i64,
+            position_us: (seek * 1_000_000.0) as i64,
+            can_next,
+            can_previous,
+            has_volume,
+            vol_min: volume_min,
+            vol_max: volume_max,
+            vol_value: volume,
+        },
+    );
 
     push(qt, move |mut app| {
         app.as_mut().set_title(QString::from(&title));
@@ -217,7 +245,13 @@ fn push_zone_list(qt: &CxxQtThread<App>, zones: &[Zone], sel: usize) {
 
 /// Fetch album art via the Core's HTTP image service into the XDG cache and
 /// point the UI at the file. `None` clears the artwork.
-fn update_art(qt: &CxxQtThread<App>, core: &Core, key: Option<&str>, last: &mut Option<String>) {
+fn update_art(
+    qt: &CxxQtThread<App>,
+    core: &Core,
+    key: Option<&str>,
+    last: &mut Option<String>,
+    mpris_server: &Option<MprisServer>,
+) {
     let key = key.map(str::to_owned);
     if *last == key {
         return;
@@ -231,6 +265,7 @@ fn update_art(qt: &CxxQtThread<App>, core: &Core, key: Option<&str>, last: &mut 
 
     let image = core.image();
     let qt = qt.clone();
+    let mpris_server = mpris_server.clone();
     tokio::spawn(async move {
         let safe: String = key.chars().filter(char::is_ascii_alphanumeric).collect();
         let dir = dirs_next::cache_dir()
@@ -255,6 +290,7 @@ fn update_art(qt: &CxxQtThread<App>, core: &Core, key: Option<&str>, last: &mut 
         }
 
         let url = format!("file://{}", path.display());
+        mpris::update_art(&mpris_server, url.clone());
         push(&qt, move |mut app| {
             app.as_mut().set_art_url(QString::from(&url));
         });
@@ -384,6 +420,7 @@ async fn session(
     events: &mut tokio::sync::broadcast::Receiver<RoonEvent>,
     rx: &mut UnboundedReceiver<Cmd>,
     qt: &CxxQtThread<App>,
+    mpris_server: &Option<MprisServer>,
 ) -> anyhow::Result<()> {
     let transport = core.transport();
     let mut zone_rx = transport.subscribe_zones().await?;
@@ -469,15 +506,16 @@ async fn session(
 
                 if seek_only {
                     if let Some(pos) = zone.and_then(|z| z.seek_position) {
+                        mpris::update_position(mpris_server, (pos * 1_000_000.0) as i64);
                         push(qt, move |mut app| app.as_mut().set_seek_position(pos));
                     }
                 } else {
                     push_zone_list(qt, &zones, sel);
-                    push_view(qt, zone);
+                    push_view(qt, zone, mpris_server);
                     let key = zone
                         .and_then(|z| z.now_playing.as_ref())
                         .and_then(|np| np.image_key.as_deref());
-                    update_art(qt, &core, key, &mut last_art);
+                    update_art(qt, &core, key, &mut last_art, mpris_server);
                 }
 
                 if !seek_only {
@@ -530,9 +568,9 @@ async fn session(
                         if let Some(z) = zones.get(i) {
                             sel_id = Some(z.zone_id.clone());
                             push_zone_list(qt, &zones, i);
-                            push_view(qt, Some(z));
+                            push_view(qt, Some(z), mpris_server);
                             let key = z.now_playing.as_ref().and_then(|np| np.image_key.as_deref());
-                            update_art(qt, &core, key, &mut last_art);
+                            update_art(qt, &core, key, &mut last_art, mpris_server);
                             sync_queue_sub!(&sel_id);
                         }
                         Ok(())

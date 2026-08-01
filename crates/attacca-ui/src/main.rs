@@ -1,6 +1,7 @@
 //! Attacca desktop UI: QML shell over the Roon worker.
 
 pub mod bridge;
+pub mod mpris;
 pub mod worker;
 
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};

@@ -175,8 +175,9 @@ impl qobject::App {
         }
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let qt_thread = self.qt_thread();
+        let worker_tx = tx.clone();
         self.as_mut().rust_mut().cmd_tx = Some(tx);
-        std::thread::spawn(move || worker::run(qt_thread, rx));
+        std::thread::spawn(move || worker::run(qt_thread, worker_tx, rx));
     }
 
     fn send(&self, cmd: Cmd) {
