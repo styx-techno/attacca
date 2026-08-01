@@ -78,11 +78,18 @@ ApplicationWindow {
 
     // Flickable's built-in wheel handling is tuned for touch physics and
     // crawls on a desktop mouse wheel; scroll a real step per notch instead.
-    // Touchpads deliver pixelDelta and keep their smooth native feel.
+    // Trust angleDelta: on Wayland a mouse wheel ALSO carries a tiny
+    // pixelDelta (~15px per notch from libinput), which must not win.
+    property bool wheelLogged: false
     function wheelScroll(view, event) {
+        if (!root.wheelLogged) {
+            root.wheelLogged = true
+            console.log("wheel: angleDelta", event.angleDelta.y,
+                        "pixelDelta", event.pixelDelta.y)
+        }
         view.cancelFlick()
-        const dy = event.pixelDelta.y !== 0 ? event.pixelDelta.y
-                                            : event.angleDelta.y * 1.6
+        const notches = event.angleDelta.y / 120
+        const dy = notches !== 0 ? notches * 240 : event.pixelDelta.y
         const maxY = view.originY + Math.max(0, view.contentHeight - view.height)
         view.contentY = Math.max(view.originY, Math.min(maxY, view.contentY - dy))
         event.accepted = true
