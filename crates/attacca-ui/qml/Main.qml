@@ -335,13 +335,16 @@ ApplicationWindow {
                 onAccepted: app.search(text)
             }
 
-            GridView {
-                id: grid
+            Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.leftMargin: 16
                 Layout.rightMargin: 16
                 visible: root.gridMode
+
+                GridView {
+                id: grid
+                anchors.fill: parent
                 clip: true
                 model: root.gridMode ? browseModel : null
                 cellWidth: Math.floor(width / Math.max(2, Math.floor(width / 176)))
@@ -349,12 +352,6 @@ ApplicationWindow {
                 onAtYEndChanged: if (atYEnd) maybeLoadMore()
 
                 ScrollBar.vertical: ScrollBar {}
-
-                WheelHandler {
-                    acceptedDevices: PointerDevice.Mouse
-                    target: null
-                    onWheel: event => root.wheelScroll(grid, event)
-                }
 
                 delegate: Item {
                     width: grid.cellWidth
@@ -400,24 +397,28 @@ ApplicationWindow {
                         onClicked: if (model.itemKey !== "") app.browseInto(model.itemKey)
                     }
                 }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    onWheel: wheel => root.wheelScroll(grid, wheel)
+                }
             }
 
-            ListView {
-                id: list
+            Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 visible: !root.gridMode
+
+                ListView {
+                id: list
+                anchors.fill: parent
                 clip: true
                 model: root.gridMode ? null : browseModel
                 onAtYEndChanged: if (atYEnd) maybeLoadMore()
 
                 ScrollBar.vertical: ScrollBar {}
-
-                WheelHandler {
-                    acceptedDevices: PointerDevice.Mouse
-                    target: null
-                    onWheel: event => root.wheelScroll(list, event)
-                }
 
                 delegate: ItemDelegate {
                     width: list.width
@@ -468,6 +469,13 @@ ApplicationWindow {
                             visible: model.hint === "list" || model.hint === "action_list"
                         }
                     }
+                }
+            }
+
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    onWheel: wheel => root.wheelScroll(list, wheel)
                 }
             }
         }
