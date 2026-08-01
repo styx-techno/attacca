@@ -4,7 +4,7 @@ pub mod bridge;
 pub mod mpris;
 pub mod worker;
 
-use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QUrl};
+use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QString, QUrl};
 
 fn main() {
     tracing_subscriber::fmt()
@@ -20,6 +20,9 @@ fn main() {
     }
 
     let mut app = QGuiApplication::new();
+    // Ties the Wayland app_id to attacca.desktop (launcher icon, window
+    // grouping, MPRIS DesktopEntry).
+    QGuiApplication::set_desktop_file_name(&QString::from("attacca"));
     let mut engine = QQmlApplicationEngine::new();
 
     if let Some(engine) = engine.as_mut() {

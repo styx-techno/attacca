@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Attacca
+GenericName=Roon Client
+Comment=Native Roon client for Linux
+Exec=attacca-ui
+Icon=attacca
+Terminal=false
+Categories=AudioVideo;Audio;Player;Qt;
+Keywords=roon;music;audio;player;remote;
+StartupWMClass=attacca
+SingleMainWindow=true

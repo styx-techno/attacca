@@ -4,7 +4,10 @@
 
 *Attacca* (It., music): proceed to the next movement without pause.
 
-> **Status: week-1 protocol spike.** Discovery, pairing, zone subscription, and transport control against a live Core. No UI yet.
+> **Status: working alpha.** Qt 6/QML desktop app with Now Playing, full
+> browse/search (library, TIDAL, Qobuz), live queue with click-to-jump,
+> keyboard shortcuts, and an MPRIS2 bridge (media keys / desktop widgets).
+> Daily-driven against Roon 2.70.
 
 ## Architecture
 
@@ -44,13 +47,31 @@ cargo run -p attacca-cli -- toggle wohnzimmer # play/pause a zone by name substr
 
 Pairing tokens are stored in `~/.config/attacca/tokens.json`.
 
+## Install
+
+Local (user scope):
+
+```sh
+cargo build --release -p attacca-ui
+install -Dm755 target/release/attacca-ui ~/.local/bin/attacca-ui
+install -Dm644 packaging/attacca.desktop ~/.local/share/applications/attacca.desktop
+install -Dm644 packaging/attacca.svg ~/.local/share/icons/hicolor/scalable/apps/attacca.svg
+```
+
+Arch: `packaging/aur/PKGBUILD` (point `url` at the public remote first).
+Flatpak: `packaging/flatpak/` (untested skeleton; cargo sources need vendoring).
+
 ## Roadmap
 
 1. ✅ Protocol spike: discover, pair, subscribe, control
-2. Now Playing + zone picker + volume (QML)
-3. Browse: artwork grid, search, play actions
-4. Guided Roon Bridge setup (PipeWire coexistence via `plug:pipewire`)
-5. Flatpak + AUR packaging, forum announcement
+2. ✅ Now Playing + zone picker + volume (QML)
+3. ✅ Browse: artwork grid, search, play actions (TIDAL/Qobuz included)
+4. ✅ Queue view, keyboard shortcuts, MPRIS2 bridge, icons/backdrop polish
+5. Zone grouping UI
+6. Guided Roon Bridge setup (waiting for Roon's .NET 10 Bridge, 2026-08-30;
+   PipeWire coexistence via `plug:pipewire`)
+7. Public repo, Flatpak/AUR publication, forum announcement
+8. Upstream the queue protocol support to shin1ohno/roon-rs
 
 ## Legal
 

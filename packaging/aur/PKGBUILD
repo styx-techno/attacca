@@ -1,0 +1,34 @@
+# Maintainer: Max Uckrow <max.uckrow@gmx.de>
+# NOTE: update the url/source once the repository has a public remote.
+pkgname=attacca-git
+pkgver=0.0.1.r0
+pkgrel=1
+pkgdesc="Native Roon client for Linux (Qt 6/QML)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/CHANGEME/attacca"
+license=('MIT')
+depends=('qt6-base' 'qt6-declarative' 'qt6-svg')
+makedepends=('git' 'rust' 'cargo')
+provides=('attacca')
+conflicts=('attacca')
+source=("git+${url}.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd attacca
+  printf "0.0.1.r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cd attacca
+  cargo build --release --locked -p attacca-ui -p attacca-cli
+}
+
+package() {
+  cd attacca
+  install -Dm755 target/release/attacca-ui "$pkgdir/usr/bin/attacca-ui"
+  install -Dm755 target/release/attacca "$pkgdir/usr/bin/attacca"
+  install -Dm644 packaging/attacca.desktop "$pkgdir/usr/share/applications/attacca.desktop"
+  install -Dm644 packaging/attacca.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/attacca.svg"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

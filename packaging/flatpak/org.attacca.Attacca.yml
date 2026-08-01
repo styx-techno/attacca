@@ -1,0 +1,36 @@
+# Flatpak manifest — UNTESTED skeleton (flatpak-builder not yet run against it).
+# Cargo dependencies must be vendored or generated with
+# flatpak-cargo-generator before an offline flatpak build works:
+#   python3 flatpak-cargo-generator.py Cargo.lock -o cargo-sources.json
+app-id: org.attacca.Attacca
+runtime: org.kde.Platform
+runtime-version: '6.9'
+sdk: org.kde.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: attacca-ui
+finish-args:
+  # Roon Core discovery + control on the LAN
+  - --share=network
+  # GPU-rendered QML
+  - --device=dri
+  - --socket=wayland
+  - --socket=fallback-x11
+  # MPRIS
+  - --own-name=org.mpris.MediaPlayer2.attacca
+modules:
+  - name: attacca
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/attacca/cargo
+    build-commands:
+      - cargo --offline build --release -p attacca-ui
+      - install -Dm755 target/release/attacca-ui /app/bin/attacca-ui
+      - install -Dm644 packaging/attacca.desktop /app/share/applications/org.attacca.Attacca.desktop
+      - install -Dm644 packaging/attacca.svg /app/share/icons/hicolor/scalable/apps/org.attacca.Attacca.svg
+    sources:
+      - type: dir
+        path: ../..
+      # - cargo-sources.json   (generate with flatpak-cargo-generator)
