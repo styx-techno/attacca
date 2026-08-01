@@ -1384,8 +1384,6 @@ dependencies = [
 [[package]]
 name = "roon-api"
 version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42c370d32f273fe591b93f015e1e1b579c9204699ff97d08ae587a3cc5bd7e35"
 dependencies = [
  "reqwest",
  "roon-moo",

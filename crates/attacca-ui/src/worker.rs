@@ -3,8 +3,8 @@
 
 use crate::bridge::qobject::App;
 use attacca_core::{
-    Browse, BrowseOptions, BrowseResult, ControlAction, Core, LoadOptions, RoonEvent, SeekMode,
-    VolumeMode, Zone, ZoneEvent,
+    Browse, BrowseOptions, BrowseResult, ControlAction, Core, LoadOptions, QueueEvent, QueueItem,
+    RoonEvent, SeekMode, VolumeMode, Zone, ZoneEvent,
 };
 use core::pin::Pin;
 use cxx_qt::CxxQtThread;
@@ -25,6 +25,7 @@ pub enum Cmd {
     BrowseBack,
     Search(String),
     LoadMore,
+    PlayFromHere(u64),
 }
 
 const PAGE_SIZE: u32 = 100;
@@ -173,6 +174,31 @@ fn push_view(qt: &CxxQtThread<App>, zone: Option<&Zone>) {
         app.as_mut().set_volume(volume);
         app.as_mut().set_volume_min(volume_min);
         app.as_mut().set_volume_max(volume_max);
+    });
+}
+
+fn push_queue(qt: &CxxQtThread<App>, items: &[QueueItem]) {
+    let json = serde_json::Value::Array(
+        items
+            .iter()
+            .map(|it| {
+                let (title, subtitle) = match &it.three_line {
+                    Some(t) => (t.line1.clone(), t.line2.clone().unwrap_or_default()),
+                    None => (it.one_line.line1.clone(), String::new()),
+                };
+                serde_json::json!({
+                    "queueItemId": it.queue_item_id,
+                    "title": title,
+                    "subtitle": subtitle,
+                    "imageKey": it.image_key.clone().unwrap_or_default(),
+                    "length": it.length.unwrap_or(0.0),
+                })
+            })
+            .collect(),
+    )
+    .to_string();
+    push(qt, move |mut app| {
+        app.as_mut().queue_items(QString::from(&json));
     });
 }
 
@@ -373,6 +399,38 @@ async fn session(
     };
     let mut did_home = false;
 
+    let mut queue_items: Vec<QueueItem> = Vec::new();
+    let mut queue_rx: Option<tokio::sync::mpsc::Receiver<QueueEvent>> = None;
+    let mut queue_key: Option<u32> = None;
+    let mut queue_zone: Option<String> = None;
+
+    // Re-point the queue subscription at the currently selected zone,
+    // unsubscribing the old one so the core can free it.
+    macro_rules! sync_queue_sub {
+        ($sel_id:expr) => {
+            if *$sel_id != queue_zone {
+                queue_zone = $sel_id.clone();
+                queue_items.clear();
+                push_queue(qt, &queue_items);
+                queue_rx = None;
+                if let Some(k) = queue_key.take() {
+                    if let Err(e) = transport.unsubscribe_queue(k).await {
+                        tracing::debug!("unsubscribe_queue failed: {e}");
+                    }
+                }
+                if let Some(zid) = queue_zone.clone() {
+                    match transport.subscribe_queue(&zid, 100).await {
+                        Ok((k, rx)) => {
+                            queue_key = Some(k);
+                            queue_rx = Some(rx);
+                        }
+                        Err(e) => tracing::warn!("subscribe_queue failed: {e}"),
+                    }
+                }
+            }
+        };
+    }
+
     loop {
         tokio::select! {
             ev = zone_rx.recv() => {
@@ -422,9 +480,43 @@ async fn session(
                     update_art(qt, &core, key, &mut last_art);
                 }
 
+                if !seek_only {
+                    sync_queue_sub!(&sel_id);
+                }
+
                 if !did_home {
                     did_home = true;
                     browse.home(qt, sel_id.clone()).await;
+                }
+            }
+
+            qev = async { queue_rx.as_mut().unwrap().recv().await }, if queue_rx.is_some() => {
+                match qev {
+                    Some(QueueEvent::Subscribed(items)) => {
+                        tracing::info!("queue: subscribed with {} item(s)", items.len());
+                        queue_items = items;
+                        push_queue(qt, &queue_items);
+                    }
+                    Some(QueueEvent::Changed(changes)) => {
+                        for c in changes {
+                            match c.operation.as_str() {
+                                "remove" => {
+                                    let start = c.index.min(queue_items.len());
+                                    let end = (c.index + c.count.unwrap_or(0)).min(queue_items.len());
+                                    queue_items.drain(start..end);
+                                }
+                                "insert" => {
+                                    if let Some(items) = c.items {
+                                        let at = c.index.min(queue_items.len());
+                                        queue_items.splice(at..at, items);
+                                    }
+                                }
+                                other => tracing::debug!("unknown queue op: {other}"),
+                            }
+                        }
+                        push_queue(qt, &queue_items);
+                    }
+                    None => queue_rx = None,
                 }
             }
 
@@ -441,9 +533,14 @@ async fn session(
                             push_view(qt, Some(z));
                             let key = z.now_playing.as_ref().and_then(|np| np.image_key.as_deref());
                             update_art(qt, &core, key, &mut last_art);
+                            sync_queue_sub!(&sel_id);
                         }
                         Ok(())
                     }
+                    Cmd::PlayFromHere(id) => match zone {
+                        Some(z) => transport.play_from_here(&z.zone_id, id).await,
+                        None => Ok(()),
+                    },
                     Cmd::PlayPause => match zone {
                         Some(z) => transport.control(&z.zone_id, ControlAction::PlayPause).await,
                         None => Ok(()),

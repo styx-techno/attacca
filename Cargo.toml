@@ -1,6 +1,12 @@
 [workspace]
 resolver = "2"
 members = ["crates/attacca-core", "crates/attacca-cli", "crates/attacca-ui"]
+exclude = ["vendor"]
+
+# Queue support (subscribe_queue/play_from_here) is not in the upstream
+# release; see vendor/roon-api/VENDORED.md.
+[patch.crates-io]
+roon-api = { path = "vendor/roon-api" }
 
 [workspace.package]
 version = "0.0.1"

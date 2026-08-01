@@ -56,6 +56,12 @@ pub mod qobject {
         #[qsignal]
         fn toast(self: Pin<&mut App>, message: QString);
 
+        /// Full queue snapshot for the selected zone as a JSON array:
+        /// [{queueItemId, title, subtitle, imageKey, length}, …]
+        #[qsignal]
+        #[cxx_name = "queueItems"]
+        fn queue_items(self: Pin<&mut App>, items_json: QString);
+
         /// Start discovery + the worker thread. Idempotent; call from QML once.
         #[qinvokable]
         fn start(self: Pin<&mut Self>);
@@ -100,6 +106,10 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "loadMore"]
         fn load_more(self: Pin<&mut Self>);
+
+        #[qinvokable]
+        #[cxx_name = "playFromHere"]
+        fn play_from_here(self: Pin<&mut Self>, queue_item_id: f64);
     }
 
     impl cxx_qt::Threading for App {}
@@ -222,5 +232,9 @@ impl qobject::App {
 
     pub fn load_more(self: Pin<&mut Self>) {
         self.send(Cmd::LoadMore);
+    }
+
+    pub fn play_from_here(self: Pin<&mut Self>, queue_item_id: f64) {
+        self.send(Cmd::PlayFromHere(queue_item_id as u64));
     }
 }

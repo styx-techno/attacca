@@ -1,3 +1,4 @@
+import QtCore
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -22,6 +23,48 @@ ApplicationWindow {
     property int browseCount: 0
     property bool inSearch: false
     property bool gridMode: false
+
+    Settings {
+        location: StandardPaths.writableLocation(StandardPaths.GenericConfigLocation)
+                  + "/attacca/ui.conf"
+        property alias windowWidth: root.width
+        property alias windowHeight: root.height
+    }
+
+    Shortcut {
+        sequence: "Space"
+        enabled: !searchField.activeFocus
+        onActivated: app.playPause()
+    }
+    Shortcut {
+        sequence: "Ctrl+Right"
+        onActivated: app.next()
+    }
+    Shortcut {
+        sequence: "Ctrl+Left"
+        onActivated: app.previous()
+    }
+    Shortcut {
+        sequence: "Ctrl+F"
+        onActivated: {
+            tabs.currentIndex = 1
+            searchField.forceActiveFocus()
+            searchField.selectAll()
+        }
+    }
+    Shortcut {
+        sequence: "Escape"
+        enabled: searchField.activeFocus
+                 || (tabs.currentIndex === 1 && (root.browseLevel > 0 || root.inSearch))
+        onActivated: {
+            if (searchField.activeFocus)
+                searchField.focus = false
+            else if (root.inSearch && root.browseLevel === 0)
+                app.browseHome()
+            else
+                app.browseBack()
+        }
+    }
 
     App {
         id: app
@@ -54,9 +97,17 @@ ApplicationWindow {
             toastLabel.text = message
             toastTimer.restart()
         }
+
+        onQueueItems: json => {
+            const items = JSON.parse(json)
+            queueModel.clear()
+            for (const it of items)
+                queueModel.append(it)
+        }
     }
 
     ListModel { id: browseModel }
+    ListModel { id: queueModel }
 
     function fmt(s) {
         s = Math.max(0, Math.round(s))
@@ -109,6 +160,7 @@ ApplicationWindow {
 
         TabButton { text: "Now Playing" }
         TabButton { text: "Browse" }
+        TabButton { text: "Queue" }
     }
 
     StackLayout {
@@ -502,6 +554,99 @@ ApplicationWindow {
                     acceptedButtons: Qt.NoButton
                     onWheel: wheel => root.wheelScroll(list, listAnim, wheel)
                 }
+            }
+        }
+
+        // ─────────────────────────────── Queue ─────────────────────────────
+        Item {
+            ListView {
+                id: queueList
+                anchors.fill: parent
+                anchors.margins: 16
+                clip: true
+                model: queueModel
+                onDraggingChanged: if (dragging) queueAnim.stop()
+
+                ScrollBar.vertical: ScrollBar {}
+
+                delegate: ItemDelegate {
+                    width: queueList.width
+                    onClicked: app.playFromHere(model.queueItemId)
+
+                    contentItem: RowLayout {
+                        spacing: 12
+
+                        Label {
+                            text: "▶"
+                            color: root.Material.accent
+                            font.pixelSize: 12
+                            visible: index === 0
+                        }
+
+                        Rectangle {
+                            implicitWidth: 44
+                            implicitHeight: 44
+                            radius: 4
+                            color: "#191920"
+                            visible: model.imageKey !== ""
+
+                            Image {
+                                anchors.fill: parent
+                                source: thumb(model.imageKey, 88)
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: model.title
+                                font.pixelSize: 14
+                                elide: Text.ElideRight
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                text: model.subtitle
+                                font.pixelSize: 12
+                                color: "#7c7d88"
+                                elide: Text.ElideRight
+                                visible: model.subtitle !== ""
+                            }
+                        }
+
+                        Label {
+                            text: fmt(model.length)
+                            color: "#7c7d88"
+                            font.pixelSize: 12
+                            visible: model.length > 0
+                        }
+                    }
+                }
+            }
+
+            Label {
+                anchors.centerIn: parent
+                text: "Queue is empty"
+                color: "#7c7d88"
+                visible: queueModel.count === 0
+            }
+
+            NumberAnimation {
+                id: queueAnim
+                target: queueList
+                property: "contentY"
+                duration: 160
+                easing.type: Easing.OutCubic
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.NoButton
+                onWheel: wheel => root.wheelScroll(queueList, queueAnim, wheel)
             }
         }
     }
