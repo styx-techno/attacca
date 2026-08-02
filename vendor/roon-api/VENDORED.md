@@ -8,10 +8,20 @@ Applied via `[patch.crates-io]` in the workspace root.
 
 ## Local changes
 
-- `transport.rs`: added `subscribe_queue` / `unsubscribe_queue` /
-  `play_from_here` (the `com.roonlabs.transport:2` queue surface upstream
-  never implemented) plus the `QueueEvent` / `QueueItem` / `QueueChange`
-  types in `queue.rs`.
+Queue support for `com.roonlabs.transport:2`, which upstream does not cover:
 
-Intent is to upstream these; drop the vendor dir once a release with queue
-support exists on crates.io.
+- `queue.rs`: `QueueItem`, `QueueChange`, `QueueOperation`, `QueueEvent`.
+- `transport.rs`: `subscribe_queue`, `unsubscribe_queue`, `play_from_here`.
+- `lib.rs`: the module and its re-exports, plus `LoopMode`, which upstream
+  defines but does not re-export from the crate root.
+
+`src/` is byte-identical to
+[shin1ohno/roon-rs#13](https://github.com/shin1ohno/roon-rs/pull/13), so the
+code Attacca runs is exactly the code under review. Keep it that way — if the
+PR is revised, re-sync rather than patching here.
+
+`Cargo.toml` is the one file that legitimately differs: the upstream crate is
+part of a workspace and uses path dependencies and inherited lints, whereas
+this copy has to stand alone. Those differences must not be sent upstream.
+
+Drop this directory once a release with queue support reaches crates.io.

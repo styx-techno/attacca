@@ -4,7 +4,7 @@
 use crate::bridge::qobject::App;
 use attacca_core::{
     Browse, BrowseOptions, BrowseResult, ControlAction, Core, LoadOptions, QueueEvent, QueueItem,
-    RoonEvent, SeekMode, VolumeMode, Zone, ZoneEvent,
+    QueueOperation, RoonEvent, SeekMode, VolumeMode, Zone, ZoneEvent,
 };
 use core::pin::Pin;
 use cxx_qt::CxxQtThread;
@@ -571,19 +571,21 @@ async fn session(
                     }
                     Some(QueueEvent::Changed(changes)) => {
                         for c in changes {
-                            match c.operation.as_str() {
-                                "remove" => {
+                            match c.operation {
+                                QueueOperation::Remove => {
                                     let start = c.index.min(queue_items.len());
                                     let end = (c.index + c.count.unwrap_or(0)).min(queue_items.len());
                                     queue_items.drain(start..end);
                                 }
-                                "insert" => {
+                                QueueOperation::Insert => {
                                     if let Some(items) = c.items {
                                         let at = c.index.min(queue_items.len());
                                         queue_items.splice(at..at, items);
                                     }
                                 }
-                                other => tracing::debug!("unknown queue op: {other}"),
+                                QueueOperation::Unknown => {
+                                    tracing::debug!("unmodelled queue operation at {}", c.index)
+                                }
                             }
                         }
                         push_queue(qt, &queue_items);

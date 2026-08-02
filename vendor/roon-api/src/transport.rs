@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use roon_moo::MooVerb;
 use roon_moo::connection::MooConnection;
@@ -6,7 +7,13 @@ use tokio::sync::mpsc;
 
 use crate::error::ApiError;
 use crate::output::Output;
+use crate::queue::{QueueEvent, parse_queue_event};
 use crate::zone::{Zone, ZoneSeek};
+
+/// Zone and output subscriptions use the fixed keys 0 and 1, so queue
+/// subscriptions — of which there may be several at once, one per zone — are
+/// allocated from a counter starting above them.
+static NEXT_QUEUE_SUBSCRIPTION_KEY: AtomicU32 = AtomicU32::new(2);
 
 /// Events received from a zone subscription.
 #[derive(Debug, Clone)]
@@ -397,16 +404,21 @@ impl Transport {
         Ok(outputs)
     }
 
-    /// Subscribe to a zone's play queue (local addition, see VENDORED.md).
+    /// Subscribe to a zone's play queue.
     ///
-    /// Returns the subscription key (for [`Self::unsubscribe_queue`]) and a
-    /// receiver yielding the initial snapshot followed by incremental changes.
+    /// Returns the subscription key — needed for [`Self::unsubscribe_queue`] —
+    /// and a receiver yielding [`QueueEvent::Subscribed`] with the current
+    /// contents, followed by [`QueueEvent::Changed`] for each later edit.
+    ///
+    /// `max_item_count` caps how many items the core sends; it is a window on
+    /// the front of the queue, not a page size, and there is no way to ask for
+    /// a later page.
     pub async fn subscribe_queue(
         &self,
         zone_or_output_id: &str,
         max_item_count: u32,
     ) -> Result<(u32, mpsc::Receiver<QueueEvent>), ApiError> {
-        let key = QUEUE_SUB_KEY.fetch_add(1, Ordering::Relaxed);
+        let key = NEXT_QUEUE_SUBSCRIPTION_KEY.fetch_add(1, Ordering::Relaxed);
         let mut raw_rx = self
             .connection
             .subscribe(
@@ -438,18 +450,27 @@ impl Transport {
         Ok((key, rx))
     }
 
-    /// End a queue subscription so the core can release its resources.
+    /// End a queue subscription so the core can release it.
+    ///
+    /// Switching a UI between zones means subscribing to a new queue; without
+    /// this the old subscription stays live on the core.
     pub async fn unsubscribe_queue(&self, subscription_key: u32) -> Result<(), ApiError> {
         self.connection
             .send_request(
                 "com.roonlabs.transport:2/unsubscribe_queue",
-                Some(serde_json::json!({ "subscription_key": subscription_key })),
+                Some(serde_json::json!({
+                    "subscription_key": subscription_key
+                })),
             )
             .await?;
         Ok(())
     }
 
-    /// Jump playback to a specific item in the zone's queue.
+    /// Jump playback to a specific item in the zone's queue, keeping the rest
+    /// of the queue intact.
+    ///
+    /// `queue_item_id` comes from a [`crate::QueueItem`] delivered by
+    /// [`Self::subscribe_queue`].
     pub async fn play_from_here(
         &self,
         zone_or_output_id: &str,
@@ -467,11 +488,6 @@ impl Transport {
         Ok(())
     }
 }
-
-static QUEUE_SUB_KEY: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(100);
-use std::sync::atomic::Ordering;
-
-use crate::queue::{QueueEvent, parse_queue_event};
 
 fn parse_zone_event(status: &str, body: &serde_json::Value) -> Option<ZoneEvent> {
     match status {
