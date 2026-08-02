@@ -72,7 +72,22 @@ install -Dm644 packaging/attacca.desktop ~/.local/share/applications/attacca.des
 install -Dm644 packaging/attacca.svg ~/.local/share/icons/hicolor/scalable/apps/attacca.svg
 ```
 
-Flatpak: `packaging/flatpak/` (untested skeleton; cargo sources need vendoring).
+**Flatpak.** Builds and runs against the KDE 6.11 runtime; not on Flathub yet.
+
+```sh
+flatpak install --user flathub org.flatpak.Builder \
+    org.kde.Sdk//6.11 org.kde.Platform//6.11 \
+    org.freedesktop.Sdk.Extension.rust-stable//25.08
+cd packaging/flatpak
+flatpak run org.flatpak.Builder --user --install --force-clean \
+    build-dir org.attacca.Attacca.yml
+```
+
+> The Flatpak is a separate Roon extension authorization from a host install —
+> its config lives in `~/.var/app/org.attacca.Attacca/` — so it needs its own
+> approval in Roon's Settings → Extensions. Run one or the other, not both:
+> they share the extension identity `org.attacca.client`, and the Core resets
+> connections when the same identity connects twice.
 
 ## First run
 
@@ -126,10 +141,13 @@ no-cmake-calls=true
 3. ✅ Browse: artwork grid, search, play actions (TIDAL/Qobuz included)
 4. ✅ Queue view, keyboard shortcuts, MPRIS2 bridge, icons/backdrop polish
 5. ✅ Zone grouping UI, shuffle/repeat/Roon Radio, single-instance handling
-6. Guided Roon Bridge setup (waiting for Roon's .NET 10 Bridge, 2026-08-30;
+6. ✅ Packaging: PKGBUILD and Flatpak manifest both build and run
+7. Guided Roon Bridge setup (waiting for Roon's .NET 10 Bridge, 2026-08-30;
    PipeWire coexistence via `plug:pipewire`)
-7. Flatpak/AUR publication, forum announcement
-8. Upstream the queue protocol support to [shin1ohno/roon-rs](https://github.com/shin1ohno/roon-rs)
+8. Flathub and AUR publication, forum announcement
+9. Upstream the queue protocol support —
+   [roon-rs#13](https://github.com/shin1ohno/roon-rs/pull/13) is open; the
+   vendored copy in `vendor/` goes away once it lands in a release
 
 ## Legal
 
