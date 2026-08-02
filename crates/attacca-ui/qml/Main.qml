@@ -37,6 +37,10 @@ ApplicationWindow {
     property bool queueOpen: false
     property bool npOpen: false
 
+    // At the browse root the sidebar already lists every section, so repeating
+    // it in the content area is pure duplication — show a prompt instead.
+    readonly property bool atRoot: browseLevel === 0 && !inSearch
+
     Settings {
         location: StandardPaths.writableLocation(StandardPaths.GenericConfigLocation)
                   + "/attacca/ui.conf"
@@ -198,6 +202,17 @@ ApplicationWindow {
             app.loadMore()
     }
 
+    // Roon's own browse root already offers some of the sections we list as
+    // unavailable (Settings, notably, exists as a limited hierarchy). Showing
+    // both a working and a locked copy reads as a bug, so the locked entry
+    // yields. Touching navModel.count keeps this binding live.
+    function navHas(title) {
+        for (let i = 0; i < navModel.count; i++)
+            if (navModel.get(i).title === title)
+                return true
+        return false
+    }
+
     function navIcon(title) {
         const t = title.toLowerCase()
         if (t.indexOf("artist") >= 0) return "qrc:/icons/artist.svg"
@@ -343,7 +358,8 @@ ApplicationWindow {
 
                     ItemDelegate {
                         Layout.fillWidth: true
-                        height: 36
+                        visible: !root.navHas(model.title)
+                        height: visible ? 36 : 0
                         enabled: false
                         opacity: 1.0
                         hoverEnabled: true
@@ -473,13 +489,47 @@ ApplicationWindow {
                     }
                 }
 
+                // Root prompt — the sidebar carries the sections themselves.
+                // Centred by anchors, not layout alignment: the ColumnLayout
+                // collapsed to its widest child and stranded this at the left.
+                Item {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    visible: root.atRoot
+
+                    ColumnLayout {
+                        anchors.centerIn: parent
+                        spacing: 10
+
+                        Image {
+                            Layout.alignment: Qt.AlignHCenter
+                            source: "qrc:/icons/library.svg"
+                            sourceSize.width: 44
+                            sourceSize.height: 44
+                            opacity: 0.13
+                        }
+                        Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "Choose a section to browse"
+                            font.pixelSize: 15
+                            color: root.textDim
+                        }
+                        Label {
+                            Layout.alignment: Qt.AlignHCenter
+                            text: "or press Ctrl+F to search your library, TIDAL and Qobuz"
+                            font.pixelSize: 12
+                            color: root.textOff
+                        }
+                    }
+                }
+
                 // Artwork grid
                 Item {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     Layout.leftMargin: 14
                     Layout.rightMargin: 6
-                    visible: root.gridMode
+                    visible: root.gridMode && !root.atRoot
 
                     GridView {
                         id: grid
@@ -585,11 +635,16 @@ ApplicationWindow {
                     Layout.fillHeight: true
                     Layout.leftMargin: 8
                     Layout.rightMargin: 6
-                    visible: !root.gridMode
+                    visible: !root.gridMode && !root.atRoot
 
                     ListView {
                         id: list
-                        anchors.fill: parent
+                        // Full-bleed rows on a wide monitor strand the chevron
+                        // metres from the title; cap the column like Roon does.
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: Math.min(parent.width, 940)
                         clip: true
                         model: root.gridMode ? null : browseModel
                         onAtYEndChanged: if (atYEnd) maybeLoadMore()
@@ -858,11 +913,12 @@ ApplicationWindow {
                 anchors.rightMargin: 14
                 spacing: 16
 
-                // Now playing: art, metadata, expand
+                // Now playing: art, metadata, expand.
+                // The left and right groups both fill and share the remainder
+                // equally, which is what keeps the fixed-width transport group
+                // optically centred in the window.
                 RowLayout {
-                    Layout.preferredWidth: 1
                     Layout.fillWidth: true
-                    Layout.maximumWidth: 380
                     spacing: 12
 
                     Rectangle {
@@ -910,6 +966,7 @@ ApplicationWindow {
 
                     ColumnLayout {
                         Layout.fillWidth: true
+                        Layout.maximumWidth: 260
                         spacing: 1
 
                         Label {
@@ -935,13 +992,12 @@ ApplicationWindow {
                             visible: text !== ""
                         }
                     }
+                    Item { Layout.fillWidth: true }
                 }
 
                 // Transport + seek
                 ColumnLayout {
-                    Layout.preferredWidth: 1
-                    Layout.fillWidth: true
-                    Layout.maximumWidth: 560
+                    Layout.preferredWidth: 560
                     spacing: 0
 
                     RowLayout {
@@ -1035,9 +1091,7 @@ ApplicationWindow {
 
                 // Volume, queue toggle, zone
                 RowLayout {
-                    Layout.preferredWidth: 1
                     Layout.fillWidth: true
-                    Layout.maximumWidth: 360
                     spacing: 4
 
                     Item { Layout.fillWidth: true }
@@ -1087,7 +1141,7 @@ ApplicationWindow {
                     ItemDelegate {
                         id: zoneButton
                         implicitHeight: 44
-                        implicitWidth: Math.min(190, zoneRow.implicitWidth + 20)
+                        implicitWidth: Math.min(240, zoneRow.implicitWidth + 24)
                         onClicked: zoneMenu.open()
 
                         contentItem: RowLayout {
