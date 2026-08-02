@@ -64,7 +64,10 @@ modules:
       - install -Dm644 packaging/flatpak/org.attacca.Attacca.metainfo.xml
         /app/share/metainfo/org.attacca.Attacca.metainfo.xml
     sources:
+      # Flathub requires a fixed revision, not a moving branch. Bump both the
+      # tag and the commit together on each release.
       - type: git
         url: https://github.com/styx-techno/attacca.git
-        branch: main
+        tag: v0.0.1
+        commit: 45b2e3b794c8d9b84eedd740ba002f1174e1385d
       - cargo-sources.json
