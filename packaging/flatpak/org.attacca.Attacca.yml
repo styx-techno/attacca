@@ -1,23 +1,39 @@
-# Flatpak manifest — UNTESTED skeleton (flatpak-builder not yet run against it).
-# Cargo dependencies must be vendored or generated with
-# flatpak-cargo-generator before an offline flatpak build works:
-#   python3 flatpak-cargo-generator.py Cargo.lock -o cargo-sources.json
+# Flatpak manifest for Attacca.
+#
+# cargo-sources.json is generated, not hand-written. Regenerate it whenever
+# Cargo.lock changes, or the offline build will fail on a missing crate:
+#
+#   pip install tomlkit aiohttp PyYAML
+#   curl -O https://raw.githubusercontent.com/flatpak/flatpak-builder-tools/master/cargo/flatpak-cargo-generator.py
+#   python3 flatpak-cargo-generator.py ../../Cargo.lock -o cargo-sources.json
+#
+# Build and install locally with:
+#   flatpak run org.flatpak.Builder --user --install --force-clean \
+#       build-dir org.attacca.Attacca.yml
 app-id: org.attacca.Attacca
 runtime: org.kde.Platform
-runtime-version: '6.9'
+runtime-version: '6.11'
 sdk: org.kde.Sdk
 sdk-extensions:
+  # Must match the freedesktop base of org.kde.Sdk//6.11.
   - org.freedesktop.Sdk.Extension.rust-stable
 command: attacca
+
 finish-args:
-  # Roon Core discovery + control on the LAN
+  # Roon Core discovery is SOOD over UDP multicast, then MOO over a WebSocket,
+  # plus plain HTTP for artwork — all on the local network.
   - --share=network
   # GPU-rendered QML
   - --device=dri
   - --socket=wayland
   - --socket=fallback-x11
-  # MPRIS
+  # MPRIS2: own the name for media keys and desktop widgets, and talk to it so
+  # a second launch can raise the running window instead of starting a rival
+  # instance (two instances share one Roon extension identity, and the Core
+  # resets connections when the same identity connects twice).
   - --own-name=org.mpris.MediaPlayer2.attacca
+  - --talk-name=org.mpris.MediaPlayer2.attacca
+
 modules:
   - name: attacca
     buildsystem: simple
@@ -26,11 +42,22 @@ modules:
       env:
         CARGO_HOME: /run/build/attacca/cargo
     build-commands:
-      - cargo --offline build --release -p attacca-ui
+      - cargo --offline fetch --manifest-path Cargo.toml --verbose
+      - cargo --offline build --release -p attacca-ui -p attacca-cli
       - install -Dm755 target/release/attacca /app/bin/attacca
-      - install -Dm644 packaging/attacca.desktop /app/share/applications/org.attacca.Attacca.desktop
-      - install -Dm644 packaging/attacca.svg /app/share/icons/hicolor/scalable/apps/org.attacca.Attacca.svg
+      - install -Dm755 target/release/attacca-cli /app/bin/attacca-cli
+      # Flatpak looks the icon up by app-id, so the desktop entry must point at
+      # the renamed file rather than the plain "attacca" used off-Flatpak.
+      - install -Dm644 packaging/attacca.desktop
+        /app/share/applications/org.attacca.Attacca.desktop
+      - desktop-file-edit --set-icon=org.attacca.Attacca
+        /app/share/applications/org.attacca.Attacca.desktop
+      - install -Dm644 packaging/attacca.svg
+        /app/share/icons/hicolor/scalable/apps/org.attacca.Attacca.svg
+      - install -Dm644 packaging/flatpak/org.attacca.Attacca.metainfo.xml
+        /app/share/metainfo/org.attacca.Attacca.metainfo.xml
     sources:
-      - type: dir
-        path: ../..
-      # - cargo-sources.json   (generate with flatpak-cargo-generator)
+      - type: git
+        url: https://github.com/styx-techno/attacca.git
+        branch: main
+      - cargo-sources.json

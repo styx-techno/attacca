@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.attacca.Attacca</id>
+
+  <name>Attacca</name>
+  <summary>Native Roon client for Linux</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <developer id="io.github.styx-techno">
+    <name>styx</name>
+  </developer>
+
+  <description>
+    <p>
+      Roon ships desktop clients for Windows and macOS, but Linux users only get
+      the headless Roon Server and Roon Bridge. Attacca is the daily-driver
+      client Linux never got: browse your library and TIDAL/Qobuz, control every
+      zone, and play to the machine it runs on.
+    </p>
+    <p>Attacca can:</p>
+    <ul>
+      <li>Control transport, zones, grouping and volume</li>
+      <li>Browse your library plus TIDAL and Qobuz, with search and artwork</li>
+      <li>Show the live play queue and jump to any track in it</li>
+      <li>Toggle shuffle, repeat and Roon Radio</li>
+      <li>Respond to media keys and desktop widgets over MPRIS2</li>
+    </ul>
+    <p>
+      It is built on Roon's official extension API, which sets some limits:
+      the queue cannot be edited beyond jumping within it, and playlist
+      editing, DSP configuration and signal path are not reachable.
+    </p>
+    <p>
+      A Roon subscription and a Roon Core on your network are required. To play
+      audio on this machine, Roon Bridge must be installed separately — Roon's
+      terms do not permit bundling it.
+    </p>
+  </description>
+
+  <launchable type="desktop-id">org.attacca.Attacca.desktop</launchable>
+
+  <url type="homepage">https://github.com/styx-techno/attacca</url>
+  <url type="bugtracker">https://github.com/styx-techno/attacca/issues</url>
+  <url type="vcs-browser">https://github.com/styx-techno/attacca</url>
+
+  <provides>
+    <binary>attacca</binary>
+  </provides>
+
+  <categories>
+    <category>AudioVideo</category>
+    <category>Audio</category>
+    <category>Player</category>
+  </categories>
+
+  <keywords>
+    <keyword>roon</keyword>
+    <keyword>music</keyword>
+    <keyword>audio</keyword>
+    <keyword>player</keyword>
+    <keyword>remote</keyword>
+  </keywords>
+
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+
+  <requires>
+    <internet>always</internet>
+  </requires>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.0.1" date="2026-08-02">
+      <description>
+        <p>First alpha: now playing, browse and search, live queue, zone
+        grouping, playback modes and an MPRIS2 bridge.</p>
+      </description>
+    </release>
+  </releases>
+</component>
