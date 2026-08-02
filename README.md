@@ -42,7 +42,7 @@ Attacca is honest about being a very capable client, not a 1:1 clone of the nati
 cargo run -p attacca-cli -- discover          # list Cores on the LAN
 cargo run -p attacca-cli --                   # pair + watch zones (approve "Attacca"
                                               #   in Roon Settings → Extensions on first run)
-cargo run -p attacca-cli -- toggle wohnzimmer # play/pause a zone by name substring
+cargo run -p attacca-cli -- toggle kitchen    # play/pause a zone by name substring
 ```
 
 Pairing tokens are stored in `~/.config/attacca/tokens.json`.
@@ -60,6 +60,18 @@ install -Dm644 packaging/attacca.svg ~/.local/share/icons/hicolor/scalable/apps/
 
 Arch: `packaging/aur/PKGBUILD` (point `url` at the public remote first).
 Flatpak: `packaging/flatpak/` (untested skeleton; cargo sources need vendoring).
+
+## Development
+
+For QML language-server support in your editor, create an untracked
+`crates/attacca-ui/.qmlls.ini` pointing at your own checkout — the path must be
+absolute, which is why it is not committed:
+
+```ini
+[General]
+buildDir="/absolute/path/to/attacca/target/cxxqt/qml_modules"
+no-cmake-calls=true
+```
 
 ## Roadmap
 

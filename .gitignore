@@ -1,3 +1,17 @@
 /target
 **/*.rs.bk
+
+# Pairing tokens granted by the Roon Core — never commit these.
 tokens.json
+tokens-cli.json
+
+# Local editor/tooling state. .qmlls.ini holds an absolute buildDir, so it is
+# per-machine by nature; generate your own (see README).
+.qmlls.ini
+/.vscode/
+/.idea/
+*.swp
+
+# Local environment
+.env
+.env.*
