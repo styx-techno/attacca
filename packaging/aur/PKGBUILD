@@ -1,11 +1,10 @@
-# Maintainer: Max Uckrow <max.uckrow@gmx.de>
-# NOTE: update the url/source once the repository has a public remote.
+# Maintainer: styx <5517989+styx-techno@users.noreply.github.com>
 pkgname=attacca-git
 pkgver=0.0.1.r0
 pkgrel=1
 pkgdesc="Native Roon client for Linux (Qt 6/QML)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/CHANGEME/attacca"
+url="https://github.com/styx-techno/attacca"
 license=('MIT')
 depends=('qt6-base' 'qt6-declarative' 'qt6-svg')
 makedepends=('git' 'rust' 'cargo')

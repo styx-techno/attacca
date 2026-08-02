@@ -17,7 +17,7 @@ pub use roon_api::{
 pub const EXTENSION_ID: &str = "org.attacca.client";
 pub const DISPLAY_NAME: &str = "Attacca";
 pub const PUBLISHER: &str = "Attacca contributors";
-pub const EMAIL: &str = "max.uckrow@gmx.de";
+pub const EMAIL: &str = "5517989+styx-techno@users.noreply.github.com";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Pairing tokens live in `~/.config/attacca/<file>`.

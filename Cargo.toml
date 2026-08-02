@@ -12,7 +12,7 @@ roon-api = { path = "vendor/roon-api" }
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/CHANGEME/attacca"
+repository = "https://github.com/styx-techno/attacca"
 
 [workspace.dependencies]
 roon-api = "0.5"
