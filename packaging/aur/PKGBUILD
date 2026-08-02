@@ -1,30 +1,47 @@
 # Maintainer: styx <5517989+styx-techno@users.noreply.github.com>
+_pkgname=attacca
 pkgname=attacca-git
-pkgver=0.0.1.r0
+# Recomputed by pkgver() at build time; this value is only what .SRCINFO shows.
+pkgver=0.0.1.r18.gd499e2c
 pkgrel=1
 pkgdesc="Native Roon client for Linux (Qt 6/QML)"
 arch=('x86_64' 'aarch64')
 url="https://github.com/styx-techno/attacca"
 license=('MIT')
-depends=('qt6-base' 'qt6-declarative' 'qt6-svg')
-makedepends=('git' 'rust' 'cargo')
-provides=('attacca')
-conflicts=('attacca')
-source=("git+${url}.git")
+# qt6-svg is dlopen'd as an imageformat plugin to rasterise the qrc icons, so
+# it never shows up in ldd/namcap output — do not "clean it up".
+depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'hicolor-icon-theme' 'gcc-libs' 'glibc')
+makedepends=('git' 'rust')
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+# cxx-qt's C++ shim is built by gcc while Rust links with rust-lld, which
+# cannot read GCC's LTO bitcode — every cxxbridge symbol ends up undefined.
+options=('!lto')
+source=("$_pkgname::git+$url.git")
 sha256sums=('SKIP')
 
 pkgver() {
-  cd attacca
-  printf "0.0.1.r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+  cd "$_pkgname"
+  printf "0.0.1.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  # Pre-fetch so build() can run fully offline with --frozen.
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
 }
 
 build() {
-  cd attacca
-  cargo build --release --locked -p attacca-ui -p attacca-cli
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release -p attacca-ui -p attacca-cli
 }
 
 package() {
-  cd attacca
+  cd "$_pkgname"
+  # attacca-ui is the desktop app; attacca is the debug/diagnostic CLI.
   install -Dm755 target/release/attacca-ui "$pkgdir/usr/bin/attacca-ui"
   install -Dm755 target/release/attacca "$pkgdir/usr/bin/attacca"
   install -Dm644 packaging/attacca.desktop "$pkgdir/usr/share/applications/attacca.desktop"
