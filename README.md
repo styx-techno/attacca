@@ -4,6 +4,8 @@
 
 *Attacca* (It., music): proceed to the next movement without pause.
 
+![Attacca browsing an album library](packaging/screenshots/albums.png)
+
 > **Status: working alpha.** Qt 6/QML desktop app with Now Playing, full
 > browse/search (library, TIDAL, Qobuz), live queue with click-to-jump, zone
 > grouping, shuffle/repeat/Roon Radio, keyboard shortcuts, and an MPRIS2 bridge

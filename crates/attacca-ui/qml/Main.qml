@@ -918,7 +918,13 @@ ApplicationWindow {
                 // equally, which is what keeps the fixed-width transport group
                 // optically centred in the window.
                 RowLayout {
+                    // Equal preferredWidth on both flanking groups is what
+                    // makes them share the remainder evenly; left to their own
+                    // size hints the right group claims most of it and shoves
+                    // the transport controls off centre.
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    Layout.minimumWidth: 210
                     spacing: 12
 
                     Rectangle {
@@ -995,8 +1001,12 @@ ApplicationWindow {
                     Item { Layout.fillWidth: true }
                 }
 
-                // Transport + seek
+                // Transport + seek.
+                // fillWidth must be set false explicitly: a layout nested in
+                // another layout defaults to true, which stretches this group
+                // and drags the play button off centre.
                 ColumnLayout {
+                    Layout.fillWidth: false
                     Layout.preferredWidth: 560
                     spacing: 0
 
@@ -1092,6 +1102,8 @@ ApplicationWindow {
                 // Volume, queue toggle, zone
                 RowLayout {
                     Layout.fillWidth: true
+                    Layout.preferredWidth: 1
+                    Layout.minimumWidth: 340
                     spacing: 4
 
                     Item { Layout.fillWidth: true }
@@ -1141,7 +1153,10 @@ ApplicationWindow {
                     ItemDelegate {
                         id: zoneButton
                         implicitHeight: 44
-                        implicitWidth: Math.min(240, zoneRow.implicitWidth + 24)
+                        // Size from the delegate's own padding, not a guess,
+                        // or the zone name elides to "DX3 P…".
+                        implicitWidth: Math.min(260, zoneRow.implicitWidth
+                                                + leftPadding + rightPadding)
                         onClicked: zoneMenu.open()
 
                         contentItem: RowLayout {
@@ -1155,7 +1170,7 @@ ApplicationWindow {
                                 opacity: 0.65
                             }
                             Label {
-                                Layout.fillWidth: true
+                                Layout.maximumWidth: 200
                                 text: app.zoneIndex >= 0 && app.zoneIndex < app.zoneList.length
                                       ? app.zoneList[app.zoneIndex] : "No zone"
                                 font.pixelSize: 12
