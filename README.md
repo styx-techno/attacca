@@ -45,23 +45,38 @@ Attacca is honest about being a very capable client, not a 1:1 clone of the nati
   Attacca controls any zone without it — Bridge is only what makes this
   computer itself an endpoint. Installing it is manual for now (see Roadmap).
 
+The package installs two binaries: **`attacca`** is the desktop app;
+**`attacca-cli`** is a diagnostic tool you will probably never need.
+
 ## Install
 
-Local (user scope):
+**Arch and derivatives.** The PKGBUILD is self-contained — it clones this
+repository itself, so you do not need the source to build it:
 
 ```sh
-cargo build --release -p attacca-ui
-install -Dm755 target/release/attacca-ui ~/.local/bin/attacca-ui
+curl -O https://raw.githubusercontent.com/styx-techno/attacca/main/packaging/aur/PKGBUILD
+makepkg -si
+```
+
+> Not on the AUR yet: new AUR account registration is currently closed
+> following the 2025 malware incidents. The PKGBUILD above is the same one
+> that will be submitted once registration reopens.
+
+**From source, any distro** (user scope):
+
+```sh
+cargo build --release -p attacca-ui -p attacca-cli
+install -Dm755 target/release/attacca ~/.local/bin/attacca
+install -Dm755 target/release/attacca-cli ~/.local/bin/attacca-cli
 install -Dm644 packaging/attacca.desktop ~/.local/share/applications/attacca.desktop
 install -Dm644 packaging/attacca.svg ~/.local/share/icons/hicolor/scalable/apps/attacca.svg
 ```
 
-Arch: `packaging/aur/PKGBUILD`.
 Flatpak: `packaging/flatpak/` (untested skeleton; cargo sources need vendoring).
 
 ## First run
 
-Launch `attacca-ui`, then approve **Attacca** in Roon's
+Launch `attacca`, then approve **Attacca** in Roon's
 **Settings → Extensions**. The Core is found automatically over SOOD multicast.
 Pairing tokens are stored in `~/.config/attacca/tokens.json`.
 
@@ -71,16 +86,21 @@ Pairing tokens are stored in `~/.config/attacca/tokens.json`.
 
 Shortcuts: `Space` play/pause · `Ctrl+←/→` previous/next · `Ctrl+F` search · `Esc` back.
 
-## Debug CLI
+## Diagnostic CLI
 
 `attacca-cli` pairs as its own extension (`org.attacca.cli`), so it never fights
 the running app over the Core connection:
 
 ```sh
-cargo run -p attacca-cli -- discover          # list Cores on the LAN
-cargo run -p attacca-cli --                   # pair + watch zone events
-cargo run -p attacca-cli -- toggle kitchen    # play/pause a zone by name substring
+attacca-cli --help              # full usage
+attacca-cli discover            # list Cores on the LAN, with host/port/version
+attacca-cli                     # pair + watch zone events
+attacca-cli toggle kitchen      # play/pause a zone by name substring
 ```
+
+Useful when the app cannot find your Core: `discover` shows whether SOOD
+replies are arriving at all, which is the usual failure when a Roon Bridge on
+the same machine is holding the discovery port.
 
 ## Development
 

@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [[bin]]
-name = "attacca-ui"
+name = "attacca"
 path = "src/main.rs"
 
 [dependencies]

@@ -41,9 +41,9 @@ build() {
 
 package() {
   cd "$_pkgname"
-  # attacca-ui is the desktop app; attacca is the debug/diagnostic CLI.
-  install -Dm755 target/release/attacca-ui "$pkgdir/usr/bin/attacca-ui"
+  # attacca is the desktop app; attacca-cli is the diagnostic tool.
   install -Dm755 target/release/attacca "$pkgdir/usr/bin/attacca"
+  install -Dm755 target/release/attacca-cli "$pkgdir/usr/bin/attacca-cli"
   install -Dm644 packaging/attacca.desktop "$pkgdir/usr/share/applications/attacca.desktop"
   install -Dm644 packaging/attacca.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/attacca.svg"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"

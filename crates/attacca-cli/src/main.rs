@@ -1,14 +1,35 @@
-//! Week-1 protocol spike: prove SOOD discovery, MOO registration/pairing,
-//! zone subscription, and transport control against a live Roon Core.
+//! Diagnostic CLI: SOOD discovery, MOO registration/pairing, zone
+//! subscription, and transport control against a live Roon Core.
 //!
-//! Usage:
-//!   attacca discover              # raw SOOD sweep: list Cores (host, port, version)
-//!   attacca watch                 # pair + stream zone/now-playing events (default)
-//!   attacca toggle [ZONE]         # play/pause a zone (substring match), then exit
-//!   attacca --host IP --port N …  # skip discovery, connect directly
+//! This is the debugging counterpart to the `attacca` desktop app. It pairs
+//! as its own extension so the two never fight over one Core connection.
 
 use attacca_core::{ControlAction, RoonEvent, Zone, ZoneEvent};
 use std::time::Duration;
+
+const USAGE: &str = "\
+attacca-cli — diagnostic CLI for Attacca, a native Roon client for Linux
+
+USAGE:
+    attacca-cli [OPTIONS] [COMMAND]
+
+COMMANDS:
+    watch              Pair, then stream zone / now-playing events (default)
+    discover           Raw SOOD sweep: list Cores with host, port and version
+    toggle [ZONE]      Play/pause a zone (matched by name substring), then exit
+    help               Show this message
+
+OPTIONS:
+    --host <IP>        Skip discovery and connect directly to this host
+    --port <N>         Port for --host (the Core's SOOD `http_port`, e.g. 9330)
+    -h, --help         Show this message
+
+NOTES:
+    On first run, approve \"Attacca CLI\" in Roon's Settings -> Extensions.
+    Pairing tokens are stored separately from the desktop app's.
+    Set RUST_LOG=debug for protocol-level logging.
+
+    The desktop app is a separate binary: `attacca`.";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -33,6 +54,10 @@ async fn main() -> anyhow::Result<()> {
     }
 
     match command.first().map(String::as_str) {
+        Some("-h" | "--help" | "help") => {
+            println!("{USAGE}");
+            Ok(())
+        }
         Some("discover") => discover().await,
         Some("toggle") => {
             let filter = command.get(1).cloned();
@@ -44,7 +69,10 @@ async fn main() -> anyhow::Result<()> {
         None | Some("watch") => {
             with_core(host, port, |core| async move { watch(core).await }).await
         }
-        Some(other) => anyhow::bail!("unknown command: {other}"),
+        Some(other) => {
+            eprintln!("{USAGE}\n");
+            anyhow::bail!("unknown command: {other}")
+        }
     }
 }
 

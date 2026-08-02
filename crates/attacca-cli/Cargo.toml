@@ -7,7 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [[bin]]
-name = "attacca"
+name = "attacca-cli"
 path = "src/main.rs"
 
 [dependencies]

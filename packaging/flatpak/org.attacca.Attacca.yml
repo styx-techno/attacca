@@ -8,7 +8,7 @@ runtime-version: '6.9'
 sdk: org.kde.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
-command: attacca-ui
+command: attacca
 finish-args:
   # Roon Core discovery + control on the LAN
   - --share=network
@@ -27,7 +27,7 @@ modules:
         CARGO_HOME: /run/build/attacca/cargo
     build-commands:
       - cargo --offline build --release -p attacca-ui
-      - install -Dm755 target/release/attacca-ui /app/bin/attacca-ui
+      - install -Dm755 target/release/attacca /app/bin/attacca
       - install -Dm644 packaging/attacca.desktop /app/share/applications/org.attacca.Attacca.desktop
       - install -Dm644 packaging/attacca.svg /app/share/icons/hicolor/scalable/apps/org.attacca.Attacca.svg
     sources:
