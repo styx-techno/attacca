@@ -35,9 +35,12 @@ fn main() {
     }
 
     let mut app = QGuiApplication::new();
-    // Ties the Wayland app_id to attacca.desktop (launcher icon, window
-    // grouping, MPRIS DesktopEntry).
-    QGuiApplication::set_desktop_file_name(&QString::from("attacca"));
+    // Ties the Wayland app_id to our .desktop file (launcher icon, window
+    // grouping, MPRIS DesktopEntry). Inside Flatpak the desktop file is named
+    // after the app-id, so the app_id has to follow or the window matches no
+    // launcher entry and shows a generic icon.
+    let desktop_id = std::env::var("FLATPAK_ID").unwrap_or_else(|_| "attacca".to_owned());
+    QGuiApplication::set_desktop_file_name(&QString::from(&desktop_id));
     let mut engine = QQmlApplicationEngine::new();
 
     if let Some(engine) = engine.as_mut() {

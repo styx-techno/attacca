@@ -27,12 +27,15 @@ finish-args:
   - --device=dri
   - --socket=wayland
   - --socket=fallback-x11
-  # MPRIS2: own the name for media keys and desktop widgets, and talk to it so
-  # a second launch can raise the running window instead of starting a rival
-  # instance (two instances share one Roon extension identity, and the Core
-  # resets connections when the same identity connects twice).
+  # MPRIS2: media keys, desktop widgets, and the single-instance check that
+  # raises a running window instead of starting a rival (two instances share
+  # one Roon extension identity, and the Core resets connections when the same
+  # identity connects twice).
+  #
+  # Do not also add --talk-name for this bus name: flatpak keeps one policy
+  # level per name and the later flag wins, so it silently downgrades own to
+  # talk and MPRIS registration then fails with AccessDenied. own implies talk.
   - --own-name=org.mpris.MediaPlayer2.attacca
-  - --talk-name=org.mpris.MediaPlayer2.attacca
 
 modules:
   - name: attacca
@@ -50,7 +53,11 @@ modules:
       # the renamed file rather than the plain "attacca" used off-Flatpak.
       - install -Dm644 packaging/attacca.desktop
         /app/share/applications/org.attacca.Attacca.desktop
+      # The app sets its Wayland app_id from FLATPAK_ID, so both the icon and
+      # the window-matching hint follow the app-id rather than the plain
+      # "attacca" used off-Flatpak.
       - desktop-file-edit --set-icon=org.attacca.Attacca
+        --set-key=StartupWMClass --set-value=org.attacca.Attacca
         /app/share/applications/org.attacca.Attacca.desktop
       - install -Dm644 packaging/attacca.svg
         /app/share/icons/hicolor/scalable/apps/org.attacca.Attacca.svg
