@@ -14,5 +14,16 @@
         <file alias="repeat.svg">assets/repeat.svg</file>
         <file alias="repeat_one.svg">assets/repeat_one.svg</file>
         <file alias="radio.svg">assets/radio.svg</file>
+        <file alias="queue.svg">assets/queue.svg</file>
+        <file alias="chevron_up.svg">assets/chevron_up.svg</file>
+        <file alias="chevron_down.svg">assets/chevron_down.svg</file>
+        <file alias="forward.svg">assets/forward.svg</file>
+        <file alias="lock.svg">assets/lock.svg</file>
+        <file alias="library.svg">assets/library.svg</file>
+        <file alias="album.svg">assets/album.svg</file>
+        <file alias="artist.svg">assets/artist.svg</file>
+        <file alias="playlist.svg">assets/playlist.svg</file>
+        <file alias="settings.svg">assets/settings.svg</file>
+        <file alias="speaker.svg">assets/speaker.svg</file>
     </qresource>
 </RCC>
