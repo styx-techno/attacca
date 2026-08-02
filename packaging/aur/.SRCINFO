@@ -1,6 +1,6 @@
 pkgbase = attacca-git
 	pkgdesc = Native Roon client for Linux (Qt 6/QML)
-	pkgver = 0.0.1.r18.gd499e2c
+	pkgver = 0.0.1.r20.g35bd9f5
 	pkgrel = 1
 	url = https://github.com/styx-techno/attacca
 	arch = x86_64
