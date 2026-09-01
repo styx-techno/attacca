@@ -1194,6 +1194,12 @@ ApplicationWindow {
                                     onTriggered: app.selectZone(index)
                                 }
                             }
+
+                            MenuSeparator {}
+                            MenuItem {
+                                text: "Play to this computer…"
+                                onTriggered: bridgeWizard.open()
+                            }
                         }
                     }
                 }
@@ -1505,6 +1511,8 @@ ApplicationWindow {
             }
         }
     }
+
+    BridgeWizard { id: bridgeWizard }
 
     // ═════════════════════════ Connection overlay ══════════════════════════
     ColumnLayout {

@@ -11,6 +11,7 @@ license=('MIT')
 # qt6-svg is dlopen'd as an imageformat plugin to rasterise the qrc icons, so
 # it never shows up in ldd/namcap output — do not "clean it up".
 depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'hicolor-icon-theme' 'gcc-libs' 'glibc')
+optdepends=('pipewire-alsa: desktop-mix output mode in the guided Roon Bridge setup')
 makedepends=('git' 'rust')
 provides=("$_pkgname")
 conflicts=("$_pkgname")

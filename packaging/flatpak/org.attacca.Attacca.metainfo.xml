@@ -28,6 +28,11 @@
       <li>Respond to media keys and desktop widgets over MPRIS2</li>
     </ul>
     <p>
+      The guided Roon Bridge setup (playing to the computer Attacca runs on)
+      is available in native installs only — the Flatpak sandbox cannot
+      install a service on the host.
+    </p>
+    <p>
       It is built on Roon's official extension API, which sets some limits:
       the queue cannot be edited beyond jumping within it, and playlist
       editing, DSP configuration and signal path are not reachable.
@@ -35,7 +40,8 @@
     <p>
       A Roon subscription and a Roon Core on your network are required. To play
       audio on this machine, Roon Bridge must be installed separately — Roon's
-      terms do not permit bundling it.
+      terms do not permit bundling it. Native installs of Attacca can do this
+      for you, downloading it from Roon's servers on request.
     </p>
   </description>
 

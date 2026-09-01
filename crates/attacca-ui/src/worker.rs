@@ -521,7 +521,7 @@ async fn session(
                 }
 
                 zones.sort_by(|a, b| a.display_name.cmp(&b.display_name));
-                if sel_id.as_deref().map_or(true, |id| !zones.iter().any(|z| z.zone_id == id)) {
+                if sel_id.as_deref().is_none_or(|id| !zones.iter().any(|z| z.zone_id == id)) {
                     sel_id = follow_output
                         .as_ref()
                         .and_then(|oid| {

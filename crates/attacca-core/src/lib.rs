@@ -32,6 +32,12 @@ pub fn cli_token_store_path() -> PathBuf {
     config_file("tokens-cli.json")
 }
 
+/// Saved exclusive-mode device settings, so the Bridge setup's "desktop mix"
+/// override can be reverted without re-enabling the device in Roon.
+pub fn bridge_devices_path() -> PathBuf {
+    config_file("bridge-devices.json")
+}
+
 fn config_file(name: &str) -> PathBuf {
     dirs_next::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))

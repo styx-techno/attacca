@@ -14,6 +14,7 @@ pkgbase = attacca-git
 	depends = hicolor-icon-theme
 	depends = gcc-libs
 	depends = glibc
+	optdepends = pipewire-alsa: desktop-mix output mode in the guided Roon Bridge setup
 	provides = attacca
 	conflicts = attacca
 	options = !lto

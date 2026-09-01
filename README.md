@@ -8,9 +8,10 @@
 
 > **Status: working alpha.** Qt 6/QML desktop app with Now Playing, full
 > browse/search (library, TIDAL, Qobuz), live queue with click-to-jump, zone
-> grouping, shuffle/repeat/Roon Radio, keyboard shortcuts, and an MPRIS2 bridge
-> (media keys / desktop widgets). Daily-driven against Roon 2.70 on KDE/Wayland.
-> Expect rough edges; the guided Roon Bridge setup is not built yet.
+> grouping, shuffle/repeat/Roon Radio, keyboard shortcuts, an MPRIS2 bridge
+> (media keys / desktop widgets), and a guided Roon Bridge setup for playing
+> to the computer it runs on. Daily-driven against Roon 2.70 on KDE/Wayland.
+> Expect rough edges.
 
 ## Architecture
 
@@ -23,7 +24,7 @@ flowchart LR
 ```
 
 - **Control plane**: Roon's official, Apache-2.0-licensed extension API (the protocol behind [node-roon-api](https://github.com/RoonLabs/node-roon-api)), via the [`roon-api`](https://crates.io/crates/roon-api) Rust SDK. The Core is discovered via SOOD multicast; its SOOD response advertises the MOO/WebSocket port (`http_port`).
-- **Audio plane**: a locally running [Roon Bridge](https://help.roonlabs.com/portal/kb/articles/linux-install) makes this machine a first-class RAAT zone. Attacca will offer a guided setup that downloads Bridge from Roon's servers (Roon's terms do not permit bundling it).
+- **Audio plane**: a locally running [Roon Bridge](https://help.roonlabs.com/portal/kb/articles/linux-install) makes this machine a first-class RAAT zone. Attacca's guided setup downloads Bridge from Roon's servers on request (Roon's terms do not permit bundling it) and runs it as a per-user service.
 - **UI**: Qt 6 / QML — GPU scene graph, virtualized grids for large artwork libraries, first-class Wayland fractional scaling.
 
 ## What it can and cannot become
@@ -45,7 +46,9 @@ Attacca is honest about being a very capable client, not a 1:1 clone of the nati
 - **Qt 6** (`qt6-base`, `qt6-declarative`, `qt6-svg`) and a **Rust** toolchain.
 - For playback *on this machine*: a running [Roon Bridge](https://help.roonlabs.com/portal/kb/articles/linux-install).
   Attacca controls any zone without it — Bridge is only what makes this
-  computer itself an endpoint. Installing it is manual for now (see Roadmap).
+  computer itself an endpoint. The app sets it up for you: zone menu →
+  *Play to this computer…* (native installs only; the Flatpak sandbox
+  cannot install a host service).
 
 The package installs two binaries: **`attacca`** is the desktop app;
 **`attacca-cli`** is a diagnostic tool you will probably never need.
@@ -101,6 +104,15 @@ Pairing tokens are stored in `~/.config/attacca/tokens.json`.
 > Note that adding a newly required service to an existing install invalidates
 > the previous grant, so you may need to re-enable the extension after upgrades.
 
+To play *to this computer*, open the zone menu (bottom right) →
+**Play to this computer…**. Attacca downloads Roon Bridge from Roon's servers
+and runs it as a service for your user — no root needed. Devices are then
+enabled in Roon **Settings → Audio** (from Roon on your phone or another
+computer — that screen is beyond the extension API's reach). Each enabled
+device can run **exclusive** (bit-perfect, Roon's recommendation) or
+**desktop mix** (through PipeWire, sharing the output with other apps;
+needs `pipewire-alsa`).
+
 Shortcuts: `Space` play/pause · `Ctrl+←/→` previous/next · `Ctrl+F` search · `Esc` back.
 
 ## Diagnostic CLI
@@ -144,8 +156,9 @@ no-cmake-calls=true
 4. ✅ Queue view, keyboard shortcuts, MPRIS2 bridge, icons/backdrop polish
 5. ✅ Zone grouping UI, shuffle/repeat/Roon Radio, single-instance handling
 6. ✅ Packaging: PKGBUILD and Flatpak manifest both build and run
-7. Guided Roon Bridge setup (waiting for Roon's .NET 10 Bridge, 2026-08-30;
-   PipeWire coexistence via `plug:pipewire`)
+7. ✅ Guided Roon Bridge setup — per-user install of Roon's current Bridge
+   (validated against the .NET 10 build 1683), with per-device exclusive vs.
+   PipeWire desktop-mix modes
 8. Flathub and AUR publication, forum announcement
 9. Upstream the queue protocol support —
    [roon-rs#13](https://github.com/shin1ohno/roon-rs/pull/13) is open; the

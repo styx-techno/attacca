@@ -201,6 +201,7 @@ dependencies = [
  "cxx-qt-lib",
  "dirs-next",
  "mpris-server",
+ "reqwest",
  "roon-sood",
  "serde_json",
  "tokio",

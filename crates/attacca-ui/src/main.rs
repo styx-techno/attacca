@@ -1,6 +1,7 @@
 //! Attacca desktop UI: QML shell over the Roon worker.
 
 pub mod bridge;
+pub mod bridge_setup;
 pub mod mpris;
 pub mod worker;
 
