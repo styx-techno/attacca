@@ -68,6 +68,6 @@ modules:
       # tag and the commit together on each release.
       - type: git
         url: https://github.com/styx-techno/attacca.git
-        tag: v0.0.1
-        commit: 45b2e3b794c8d9b84eedd740ba002f1174e1385d
+        tag: v0.0.2
+        commit: 63b7ad3a4cdda19e53fc3f6098c62f9b73528c27
       - cargo-sources.json
