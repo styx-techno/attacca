@@ -88,6 +88,15 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.0.2" date="2026-09-01">
+      <description>
+        <p>Guided Roon Bridge setup: install Roon's Bridge per-user straight
+        from the app (downloaded from Roon's servers on request), with a
+        per-device choice between exclusive bit-perfect output and mixing
+        into the desktop through PipeWire. Native installs only — the
+        Flatpak sandbox cannot install a host service.</p>
+      </description>
+    </release>
     <release version="0.0.1" date="2026-08-02">
       <description>
         <p>First alpha: now playing, browse and search, live queue, zone

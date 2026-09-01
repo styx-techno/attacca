@@ -171,7 +171,7 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "attacca-cli"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "attacca-core",
@@ -182,7 +182,7 @@ dependencies = [
 
 [[package]]
 name = "attacca-core"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "dirs-next",
@@ -191,7 +191,7 @@ dependencies = [
 
 [[package]]
 name = "attacca-ui"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "anyhow",
  "attacca-core",
